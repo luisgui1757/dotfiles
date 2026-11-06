@@ -26,6 +26,7 @@ type NativeDriver struct {
 	APTIssue           string
 	WindowsVendor      *WindowsVendorDriver
 	WindowsVendorIssue string
+	WindowsApps        *WindowsAppDriver
 	NvimSync           *NvimSyncDriver
 	BuildTools         *WindowsBuildToolsDriver
 	ApplePrerequisites *MacOSPrerequisiteDriver
@@ -80,6 +81,9 @@ func (d *NativeDriver) provider(r Resource) (Driver, error) {
 	}
 	if d.WindowsVendor != nil && d.Context.OS == "windows" && r.ID == "tool.vcredist" {
 		return d.WindowsVendor, nil
+	}
+	if d.WindowsApps != nil && r.Bindings[d.Context.OS].Provider == "windows-app" {
+		return d.WindowsApps, nil
 	}
 	if d.Context.OS == "darwin" && r.ID == "tool.zsh" {
 		return macOSZshDriver{}, nil

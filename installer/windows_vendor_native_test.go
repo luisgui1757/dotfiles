@@ -21,7 +21,7 @@ func TestWindowsVendorPowerShellSyntax(t *testing.T) {
 			t.Skip("PowerShell parser is not available")
 		}
 	}
-	for _, script := range []string{windowsVendorObserveScript, windowsVendorInstallScript} {
+	for _, script := range []string{windowsVendorObserveScript, windowsVendorInstallScript, windowsAppObserveScript, windowsAppChangeScript} {
 		// The Windows CreateProcess limit includes the executable and encoded script.
 		if len(strings.Join(windowsVendorArguments(script), " "))+len(program)+4 >= 32767 {
 			t.Fatal("vendor PowerShell command exceeds the Windows command-line limit")

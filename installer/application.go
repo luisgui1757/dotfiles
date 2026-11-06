@@ -127,6 +127,10 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 		return controller, err
 	}
 	driver.WindowsVendorIssue = platform.WindowsVendorIssue
+	driver.WindowsApps, err = configureWindowsApps(platform, folders, driver.session)
+	if err != nil {
+		return controller, err
+	}
 	driver.BuildTools, err = configureWindowsBuildTools(platform, driver.session)
 	if err != nil {
 		return controller, err
