@@ -376,7 +376,7 @@ func (d *WindowsAppDriver) change(ctx context.Context, r Resource, action string
 			return Observation{}, errors.New(pin.Folder + " remains registered or present; its uninstaller did not establish removal")
 		}
 	} else if !after.Present || !after.Healthy || after.Scope != "user" || !strings.EqualFold(after.Location, d.location(pin)) || after.Version != pin.Version {
-		return Observation{}, errors.New("the vendor installer did not leave the signed per-user " + pin.Folder + " " + pin.Version)
+		return Observation{}, fmt.Errorf("the vendor installer did not leave the signed per-user %s %s: %+v", pin.Folder, pin.Version, after)
 	}
 	intent.After, intent.Complete = after, true
 	if err := saveDocument(d.intentPath(intent.Operation), intent); err != nil {
