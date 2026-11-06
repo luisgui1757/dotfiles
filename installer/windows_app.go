@@ -51,6 +51,10 @@ func (pin WindowsAppPin) Validate() error {
 	return nil
 }
 
+func (pin WindowsAppPin) name() string {
+	return strings.TrimSuffix(pin.Executable, ".exe")
+}
+
 func DefaultWindowsAppPins() (map[string]WindowsAppPin, error) {
 	pins := map[string]WindowsAppPin{}
 	if err := Decode(windowsAppPinData, &pins); err != nil {
@@ -157,7 +161,7 @@ func (d *WindowsAppDriver) query(ctx context.Context, pin WindowsAppPin) (window
 	}
 	output, err := d.Query(ctx, false, d.PowerShell, input, windowsVendorArguments(windowsAppObserveScript)...)
 	if err != nil {
-		return snapshot, fmt.Errorf("inspect the registered %s application: %w", pin.Folder, err)
+		return snapshot, fmt.Errorf("inspect the registered %s application: %w", pin.name(), err)
 	}
 	if err := Decode(output, &snapshot); err != nil {
 		return snapshot, err
@@ -237,7 +241,7 @@ func (d *WindowsAppDriver) Observe(ctx context.Context, r Resource, receipt Rece
 	}
 	o := Observation{Provider: "windows-app", Identity: d.location(pin), Scope: "user", Desired: "windows-auto-updating-app-v1",
 		ApplyDetail:   "run the " + pin.Publisher + " signed installer silently for the current user; it adds Start menu and desktop shortcuts; the app updates itself; personal data stays untouched",
-		RemovalDetail: "close " + pin.Folder + " and run its signed uninstaller; personal data and a t3 command that the app installed remain; a vendor update and an edit of unsigned app files are indistinguishable"}
+		RemovalDetail: "close " + pin.name() + " and run its signed uninstaller; personal data and a t3 command that the app installed remain; a vendor update and an edit of unsigned app files are indistinguishable"}
 	snapshot, err := d.query(ctx, pin)
 	if err != nil {
 		if ctx.Err() != nil {
@@ -260,7 +264,7 @@ func (d *WindowsAppDriver) Observe(ctx context.Context, r Resource, receipt Rece
 		}
 	}
 	if snapshot.Present && !snapshot.Healthy && receipt.Ownership != "created" {
-		o.ApplyBlocked = "preserve the existing " + pin.Folder + " installation: " + snapshot.HealthIssue
+		o.ApplyBlocked = "preserve the existing " + pin.name() + " installation: " + snapshot.HealthIssue
 	}
 	if receipt.OperationID == "" {
 		return o, nil
@@ -285,7 +289,7 @@ func (d *WindowsAppDriver) Observe(ctx context.Context, r Resource, receipt Rece
 			o.CompletedOperation = intent.Operation
 		}
 	} else if receipt.Status == "in-progress" {
-		o.Pending = "Resume the saved " + pin.Folder + " operation."
+		o.Pending = "Resume the saved " + pin.name() + " operation."
 		token, err := digest(struct {
 			Intent windowsAppIntent
 			State  windowsAppSnapshot
@@ -329,13 +333,13 @@ func (d *WindowsAppDriver) change(ctx context.Context, r Resource, action string
 			return Observation{}, err
 		}
 		if action == "install" && before.Present || action != "install" && (receipt.Ownership != "created" || receipt.Before.Present || !before.Present || fingerprint != receipt.After.Fingerprint) {
-			return Observation{}, errors.New("pre-existing or changed " + pin.Folder + " installation is not owned by this operation")
+			return Observation{}, errors.New("pre-existing or changed " + pin.name() + " installation is not owned by this operation")
 		}
 		if action == "remove" && (!before.Healthy || before.Scope != "user" || !strings.EqualFold(before.Location, d.location(pin))) {
-			return Observation{}, errors.New("retain " + pin.Folder + ": its signed per-user installation could not be verified")
+			return Observation{}, errors.New("retain " + pin.name() + ": its signed per-user installation could not be verified")
 		}
 		if before.Running {
-			return Observation{}, errors.New("quit " + pin.Folder + " before setup changes its installation")
+			return Observation{}, errors.New("quit " + pin.name() + " before setup changes its installation")
 		}
 		intent = windowsAppIntent{Schema: 1, Resource: r.ID, Operation: receipt.OperationID, Action: action, Pin: pin, Before: before}
 		intent.Command, err = d.command(intent)
@@ -365,7 +369,7 @@ func (d *WindowsAppDriver) change(ctx context.Context, r Resource, action string
 		return Observation{}, errors.Join(runErr, err)
 	}
 	if *reply.ExitCode != 0 {
-		return Observation{}, &nativeCommandError{Message: fmt.Sprintf("%s setup failed with exit code %d", pin.Folder, *reply.ExitCode), ExitCode: reply.ExitCode}
+		return Observation{}, &nativeCommandError{Message: fmt.Sprintf("%s setup failed with exit code %d", pin.name(), *reply.ExitCode), ExitCode: reply.ExitCode}
 	}
 	after, err := d.query(ctx, pin)
 	if err != nil {
@@ -373,10 +377,10 @@ func (d *WindowsAppDriver) change(ctx context.Context, r Resource, action string
 	}
 	if action == "remove" {
 		if after.Present {
-			return Observation{}, errors.New(pin.Folder + " remains registered or present; its uninstaller did not establish removal")
+			return Observation{}, errors.New(pin.name() + " remains registered or present; its uninstaller did not establish removal")
 		}
 	} else if !after.Present || !after.Healthy || after.Scope != "user" || !strings.EqualFold(after.Location, d.location(pin)) || after.Version != pin.Version {
-		return Observation{}, fmt.Errorf("the vendor installer did not leave the signed per-user %s %s: %+v", pin.Folder, pin.Version, after)
+		return Observation{}, fmt.Errorf("the vendor installer did not leave the signed per-user %s %s: %+v", pin.name(), pin.Version, after)
 	}
 	intent.After, intent.Complete = after, true
 	if err := saveDocument(d.intentPath(intent.Operation), intent); err != nil {

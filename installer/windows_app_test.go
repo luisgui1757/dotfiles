@@ -38,7 +38,7 @@ func newWindowsAppFixture(t *testing.T) *windowsAppFixture {
 	data := []byte("reviewed T3 Code installer fixture")
 	hash := sha256.Sum256(data)
 	pin := WindowsAppPin{Version: "0.1.7", URL: "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/T3-Code-0.1.7-x64.exe", SHA256: hex.EncodeToString(hash[:]), Size: int64(len(data)),
-		ProductCode: "e9197887-efb3-55e0-985e-d6d3b5dd594a", Publisher: "T3 Tools Inc", Folder: "T3 Code (Beta)", Executable: "T3 Code (Beta).exe", Uninstaller: "Uninstall T3 Code (Beta).exe"}
+		ProductCode: "e9197887-efb3-55e0-985e-d6d3b5dd594a", Publisher: "T3 Tools Inc", Folder: "t3code", Executable: "T3 Code (Beta).exe", Uninstaller: "Uninstall T3 Code (Beta).exe"}
 	f := &windowsAppFixture{resource: Resource{ID: "app.t3-code-windows", Action: "package", Scope: "user"}, receipt: Receipt{OperationID: strings.Repeat("a", 64), Status: "in-progress", Ownership: "uncertain"}, payload: data}
 	f.driver = &WindowsAppDriver{Directory: filepath.Join(root, "windows-app"), WorkerDirectory: filepath.Join(root, "worker"), PowerShell: program, Programs: filepath.Join(root, "Programs"),
 		Pins: map[string]WindowsAppPin{f.resource.ID: pin}}

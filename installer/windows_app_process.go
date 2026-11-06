@@ -68,7 +68,7 @@ if ($present -and $location) { $running = Test-AppRunning $location }
 
 const windowsAppChangeScript = windowsAppPrelude + `
 $location = Join-Path ([string]$inputData.Programs) ([string]$inputData.Folder)
-if (Test-AppRunning $location) { throw ('Quit ' + $inputData.Folder + ' before setup changes its installation') }
+if (Test-AppRunning $location) { throw ('Quit ' + [IO.Path]::GetFileNameWithoutExtension([string]$inputData.Executable) + ' before setup changes its installation') }
 $records = @(Get-AppRegistration)
 $start = [Diagnostics.ProcessStartInfo]::new()
 $start.UseShellExecute = $false
