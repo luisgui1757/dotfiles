@@ -164,7 +164,7 @@ required dependencies are still resolved automatically in the preview.
 | gh-dash | ✓ | ✓ | ✓ |
 | GitLab CLI | ✓ | ✓ | ✓ |
 | Azure CLI | ✓ | glibc | ✓ |
-| T3 Code | ✓ | ✓ | — |
+| T3 Code | ✓ | ✓ | ✓ |
 | T3 Code server (browser UI) | ✓ | ✓ | ✓ |
 | Claude Code CLI | ✓ | ✓ | ✓ |
 | Codex CLI | ✓ | ✓ | ✓ |
@@ -299,9 +299,14 @@ registry mismatch disables its language-server/formatter setup until repair succ
   tools** moves the app to the reviewed release. The script also starts the
   app without Chromium's sandbox, because the sandbox needs user namespaces
   that Ubuntu restricts.
-- On Windows, T3 ships the app only as an installer, and setup never runs a
-  vendor installer. Install the app yourself with
-  `winget install T3Tools.T3Code`. T3 then updates itself.
+- On Windows, setup downloads the official v0.1.7 installer and checks its
+  SHA-256 and its `T3 Tools Inc` signature. Then it runs the installer silently
+  for the current user, without an administrator prompt. The installer adds
+  Start menu and desktop shortcuts, and T3 updates itself. Removal runs the
+  signed T3 uninstaller. Quit T3 Code before setup changes or removes it.
+- An app that you installed yourself, for example with
+  `winget install T3Tools.T3Code`, stays yours. Setup uses it, applies only
+  the settings and the theme, and never removes it.
 
 The app can add its own `t3` command: open **Settings → About** and choose
 **Install** next to **t3 command**.

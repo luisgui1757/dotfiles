@@ -376,8 +376,12 @@ func (d *WindowsVendorDriver) change(ctx context.Context, r Resource, action str
 	return d.Observe(ctx, r, receipt)
 }
 
-func (d *WindowsVendorDriver) prepare(ctx context.Context, intent windowsVendorIntent) (result error) {
-	directory := filepath.Join(d.Directory, "payloads", intent.Pin.SHA256)
+func (d *WindowsVendorDriver) prepare(ctx context.Context, intent windowsVendorIntent) error {
+	return prepareWindowsInstaller(ctx, d.Client, d.Directory, intent.Pin.Version, intent.Pin.URL, intent.Pin.SHA256, intent.Pin.Size)
+}
+
+func prepareWindowsInstaller(ctx context.Context, client *http.Client, root, version, source, sha string, size int64) (result error) {
+	directory := filepath.Join(root, "payloads", sha)
 	file := filepath.Join(directory, "installer.exe")
 	bound, err := bindConfigDestination(file)
 	if err != nil || bound != file {
@@ -392,8 +396,8 @@ func (d *WindowsVendorDriver) prepare(ctx context.Context, intent windowsVendorI
 			return err
 		}
 		defer func() { result = errors.Join(result, os.RemoveAll(stage)) }()
-		pin := ArchivePin{Version: intent.Pin.Version, URL: intent.Pin.URL, SHA256: intent.Pin.SHA256, Format: "file", File: "installer.exe", RequiredFiles: []string{"installer.exe"}}
-		if err := downloadArchive(ctx, d.Client, pin, filepath.Join(stage, "payload")); err != nil {
+		pin := ArchivePin{Version: version, URL: source, SHA256: sha, Format: "file", File: "installer.exe", RequiredFiles: []string{"installer.exe"}}
+		if err := downloadArchive(ctx, client, pin, filepath.Join(stage, "payload")); err != nil {
 			return err
 		}
 		if err := os.Rename(filepath.Join(stage, "payload"), directory); err != nil {
@@ -401,7 +405,7 @@ func (d *WindowsVendorDriver) prepare(ctx context.Context, intent windowsVendorI
 		}
 	}
 	info, err := os.Lstat(file)
-	if err != nil || !info.Mode().IsRegular() || info.Size() != intent.Pin.Size {
+	if err != nil || !info.Mode().IsRegular() || info.Size() != size {
 		return errors.Join(errors.New("vendor installer payload is missing, redirected or damaged"), err)
 	}
 	handle, err := os.Open(file)
@@ -409,11 +413,11 @@ func (d *WindowsVendorDriver) prepare(ctx context.Context, intent windowsVendorI
 		return err
 	}
 	hash := sha256.New()
-	_, readErr := io.Copy(hash, io.LimitReader(handle, intent.Pin.Size+1))
+	_, readErr := io.Copy(hash, io.LimitReader(handle, size+1))
 	if err := errors.Join(readErr, handle.Close()); err != nil {
 		return err
 	}
-	if hex.EncodeToString(hash.Sum(nil)) != intent.Pin.SHA256 {
+	if hex.EncodeToString(hash.Sum(nil)) != sha {
 		return errors.New("vendor installer payload differs from its reviewed SHA-256")
 	}
 	return nil

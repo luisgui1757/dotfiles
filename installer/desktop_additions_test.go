@@ -21,7 +21,7 @@ func TestAdditionalDesktopChoicesHaveIndependentProviders(t *testing.T) {
 	}
 	for _, target := range []Context{{OS: "darwin", Arch: "arm64"}, linux, {OS: "linux", Arch: "arm64"}, {OS: "windows", Arch: "amd64"}} {
 		for _, id := range []string{"openwhispr", "obsidian", "tailscale", "zen", "t3-code-app"} {
-			available := target.OS == "darwin" || target.OS == "linux" && (id != "openwhispr" || target.Arch == "amd64")
+			available := target.OS == "darwin" || target.OS == "linux" && (id != "openwhispr" || target.Arch == "amd64") || target.OS == "windows" && id == "t3-code-app"
 			closure, err := catalog.Closure([]string{id}, target)
 			if (err == nil) != available {
 				t.Fatalf("%s on %+v: %v", id, target, err)
@@ -35,6 +35,9 @@ func TestAdditionalDesktopChoicesHaveIndependentProviders(t *testing.T) {
 			}
 			if target.OS == "darwin" && id == "t3-code-app" {
 				application = "app.t3-code"
+			}
+			if target.OS == "windows" && id == "t3-code-app" {
+				application = "app.t3-code-windows"
 			}
 			if target.OS == "linux" && id == "obsidian" {
 				application = obsidianPortable

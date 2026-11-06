@@ -227,7 +227,9 @@ The **T3 Code** selection now installs the desktop app on macOS and on
 Ubuntu/Debian. The earlier selection keeps its standalone `t3` package and is
 now named **T3 Code server**. A saved selection keeps the server and does not
 add the app. To add the app, tick **T3 Code** in **Choose tools**. On Windows,
-install the app with `winget install T3Tools.T3Code`.
+the same choice installs the signed per-user app. An app that you installed
+yourself, for example with `winget install T3Tools.T3Code`, stays yours: setup
+uses it and applies only the settings and the theme.
 
 Both T3 selections now set some T3 settings and the Rosé Pine Moon theme. The
 README lists them. When `~/.t3/userdata/settings.json` already has one of these

@@ -317,12 +317,13 @@
     {
       "id": "t3-code-app",
       "name": "T3 Code",
-      "description": "Desktop app with its own server; configure/authenticate a provider separately; on Linux the official .deb runs privately without Chromium's sandbox and without automatic updates",
+      "description": "Desktop app with its own server; configure/authenticate a provider separately; on Linux the official .deb runs privately without Chromium's sandbox and without automatic updates; on Windows the signed installer installs it for the current user",
       "capability": true,
       "category": "AI coding",
       "platforms": [
         "darwin",
-        "linux"
+        "linux",
+        "windows"
       ],
       "requires": [
         "integration.t3-code"
@@ -335,6 +336,9 @@
         "linux": [
           "tool.t3-code-app",
           "desktop.t3-code"
+        ],
+        "windows": [
+          "app.t3-code-windows"
         ]
       }
     },
@@ -3080,6 +3084,22 @@
       "bindings": {
         "darwin": {
           "provider": "homebrew-cask",
+          "package": "t3-code"
+        }
+      }
+    },
+    {
+      "id": "app.t3-code-windows",
+      "name": "T3 Code application",
+      "description": "Official signed per-user app; normal app updates and personal T3 data remain under your control",
+      "platforms": [
+        "windows"
+      ],
+      "action": "package",
+      "scope": "user",
+      "bindings": {
+        "windows": {
+          "provider": "windows-app",
           "package": "t3-code"
         }
       }

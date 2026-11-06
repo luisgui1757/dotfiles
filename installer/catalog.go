@@ -128,7 +128,7 @@ func (c *Catalog) Validate() error {
 			if (os != "darwin" && os != "linux" && os != "windows") || !r.Available(Context{OS: os}) || binding.Package == "" || r.Action == "" {
 				return fmt.Errorf("invalid package binding for %s on %s", r.ID, os)
 			}
-			if binding.Provider != "archive" && !isHomebrewPackage(binding.Provider) && binding.Provider != "apt" {
+			if binding.Provider != "archive" && !isHomebrewPackage(binding.Provider) && binding.Provider != "apt" && binding.Provider != "windows-app" {
 				return fmt.Errorf("invalid package provider %q for %s", binding.Provider, r.ID)
 			}
 			if binding.Provider == "apt" && (os != "linux" || !aptArgument.MatchString(binding.Package)) {
@@ -141,6 +141,9 @@ func (c *Catalog) Validate() error {
 			}
 			if binding.Provider == "homebrew-cask" && map[string]string{"app.zen": "zen", "app.t3-code": "t3-code"}[r.ID] != binding.Package {
 				return fmt.Errorf("unsupported native application %s", r.ID)
+			}
+			if binding.Provider == "windows-app" && (os != "windows" || r.ID != "app.t3-code-windows" || binding.Package != "t3-code" || r.Scope != "user") {
+				return fmt.Errorf("unsupported Windows application %s", r.ID)
 			}
 			key := os + "/" + binding.Provider + "/" + binding.Package
 			if previous, exists := packageOwners[key]; exists {
