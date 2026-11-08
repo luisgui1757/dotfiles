@@ -1000,13 +1000,18 @@ Useful standalone tools:
   Podman. lazydocker uses the Docker socket, or the socket in `DOCKER_HOST`. For
   Podman on Linux, run `systemctl --user enable --now podman.socket` one time,
   then add `export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"` to
-  `~/.zshrc.local`. On macOS and Windows, `podman machine start` shows how
-  Docker API clients connect, with the `DOCKER_HOST` value when one is
-  necessary. With Podman, the Compose services panel is partial (upstream issues
-  #556 and #676). Config: `~/.config/lazydocker` on Linux,
+  `~/.zshrc.local` for zsh or to `~/.bashrc` for bash. On macOS and Windows,
+  `podman machine start` shows how Docker API clients connect, with the
+  `DOCKER_HOST` value when one is necessary. With Podman, the Compose services
+  panel is partial (upstream issues
+  [556](https://github.com/jesseduffield/lazydocker/issues/556) and
+  [676](https://github.com/jesseduffield/lazydocker/issues/676)). Default
+  config: `~/.config/lazydocker` on Linux,
   `~/Library/Application Support/lazydocker` on macOS and `%APPDATA%\lazydocker`
   on Windows. If a `jesseduffield/lazydocker` folder exists in that parent
-  folder, lazydocker reads it and not the managed file.
+  folder, lazydocker reads it and not the managed file. When `XDG_CONFIG_HOME`
+  is set, lazydocker reads `$XDG_CONFIG_HOME/lazydocker`, and setup writes there
+  only on Linux.
 - `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
   `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
   or `gh auth setup-git` writes still works after an Update. A helper line

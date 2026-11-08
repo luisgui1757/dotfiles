@@ -65,7 +65,7 @@ func TestNativeArchivePinnedCommandLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, tool := range []string{"nvim", "rg", "gh", "lazygit", "jq", "tree-sitter", "hyperfine", "node", "shellcheck", "taplo", "gh-dash", "powershell", "cmake", "python", "herdr", "editorconfig", "clipboard", "atuin", "superfile", "glab", "az", "lazydocker"} {
+	for _, tool := range []string{"nvim", "rg", "gh", "lazygit", "lazydocker", "jq", "tree-sitter", "hyperfine", "node", "shellcheck", "taplo", "gh-dash", "powershell", "cmake", "python", "herdr", "editorconfig", "clipboard", "atuin", "superfile", "glab", "az"} {
 		t.Run(tool, func(t *testing.T) {
 			pin, ok := pins["tool."+tool]
 			if !ok && (tool == "powershell" || tool == "clipboard") && runtime.GOOS != "windows" {
