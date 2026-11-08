@@ -837,6 +837,56 @@
         ]
       }
     },
+    "tool.lazydocker": {
+      "darwin/arm64": {
+        "version": "0.25.2",
+        "url": "https://github.com/jesseduffield/lazydocker/releases/download/v0.25.2/lazydocker_0.25.2_Darwin_arm64.tar.gz",
+        "sha256": "4a54d7b4abdf255b2bce9806641eac5568d5b7fbc820c1b5d3f9e34ea1367d60",
+        "format": "tar.gz",
+        "commands": {
+          "lazydocker": "lazydocker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/arm64": {
+        "version": "0.25.2",
+        "url": "https://github.com/jesseduffield/lazydocker/releases/download/v0.25.2/lazydocker_0.25.2_Linux_arm64.tar.gz",
+        "sha256": "005c38b685aaa557e7d646d83a3dadb5024340eeed8c6a2e1949eee6f530de23",
+        "format": "tar.gz",
+        "commands": {
+          "lazydocker": "lazydocker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "linux/amd64": {
+        "version": "0.25.2",
+        "url": "https://github.com/jesseduffield/lazydocker/releases/download/v0.25.2/lazydocker_0.25.2_Linux_x86_64.tar.gz",
+        "sha256": "0d9dbfc26068b218e7ed84b104748cadc6e3cf733c0afd35465306fb39b9523c",
+        "format": "tar.gz",
+        "commands": {
+          "lazydocker": "lazydocker"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      },
+      "windows/amd64": {
+        "version": "0.25.2",
+        "url": "https://github.com/jesseduffield/lazydocker/releases/download/v0.25.2/lazydocker_0.25.2_Windows_x86_64.zip",
+        "sha256": "facae8869c1bf144468191c563002162273a2c2761f052659170530cae3fa8a9",
+        "format": "zip",
+        "commands": {
+          "lazydocker": "lazydocker.exe"
+        },
+        "bin_dirs": [
+          "."
+        ]
+      }
+    },
     "tool.jq": {
       "darwin/arm64": {
         "version": "1.8.2",

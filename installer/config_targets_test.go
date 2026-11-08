@@ -48,9 +48,10 @@ func TestWindowsConfigurationUsesIndependentlyRedirectedKnownFolders(t *testing.
 	root := t.TempDir()
 	folders := ConfigFolders{Home: filepath.Join(root, "profile"), Config: filepath.Join(root, "configuration"), LocalAppData: filepath.Join(root, "redirected local"), AppData: filepath.Join(root, "redirected roaming"), Documents: filepath.Join(root, "redirected documents")}
 	for resource, destinations := range map[string][]string{
-		"config.nvim":    {filepath.Join(folders.LocalAppData, "nvim")},
-		"config.herdr":   {filepath.Join(folders.AppData, "herdr", "config.toml")},
-		"config.lazygit": {filepath.Join(folders.LocalAppData, "lazygit", "config.yml")},
+		"config.nvim":       {filepath.Join(folders.LocalAppData, "nvim")},
+		"config.herdr":      {filepath.Join(folders.AppData, "herdr", "config.toml")},
+		"config.lazygit":    {filepath.Join(folders.LocalAppData, "lazygit", "config.yml")},
+		"config.lazydocker": {filepath.Join(folders.AppData, "lazydocker", "config.yml")},
 	} {
 		targets, err := m.Resolve(c, Context{OS: "windows", Arch: "amd64"}, folders, filepath.Join(root, "source"), resource)
 		if err != nil || len(targets) != len(destinations) {

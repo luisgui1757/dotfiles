@@ -40,7 +40,7 @@ Other distributions, Linuxbrew, musl and Intel macOS are out of scope.
 | `installer/config-targets.json` | The configuration target manifest |
 | `setup.sh`, `setup.ps1` | Interactive entrypoints. They run only from a local clone. |
 | `scripts/installer-bootstrap.*` | The verified private Go bootstrap |
-| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/`, `git/`, `lazygit/`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
+| `nvim/`, `tmux/`, `herdr/`, `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/`, `git/`, `lazygit/`, `lazydocker/`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/` | Tool configuration |
 | `release/` | The release manifest and proofs |
 | `tests/` | Tests by area. `tests/static/` holds the repository checks. |
 | `.github/` | Workflows, rulesets and the identities of the checks that must pass |
