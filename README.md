@@ -1011,7 +1011,7 @@ Useful standalone tools:
   on Windows. If a `jesseduffield/lazydocker` folder exists in that parent
   folder, lazydocker reads it and not the managed file. When `XDG_CONFIG_HOME`
   is set, lazydocker reads `$XDG_CONFIG_HOME/lazydocker`, and setup writes there
-  only on Linux.
+  only on Linux. When `CONFIG_DIR` is set, lazydocker reads only that folder.
 - `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
   `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
   or `gh auth setup-git` writes still works after an Update. A helper line
