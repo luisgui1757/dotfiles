@@ -245,6 +245,17 @@
       "scope": "user"
     },
     {
+      "id": "lazydocker",
+      "name": "lazydocker",
+      "description": "Terminal UI for Docker and Podman; needs a running Docker engine or the Podman API socket",
+      "capability": true,
+      "category": "Containers",
+      "requires": [
+        "config.lazydocker"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "ghostty",
       "name": "Ghostty",
       "description": "Terminal with the shared configuration and desktop launcher",
@@ -912,6 +923,29 @@
         "windows": {
           "provider": "archive",
           "package": "tool.lazygit"
+        }
+      }
+    },
+    {
+      "id": "tool.lazydocker",
+      "name": "lazydocker",
+      "requires": [
+        "integration.shells"
+      ],
+      "action": "archive",
+      "scope": "user",
+      "bindings": {
+        "darwin": {
+          "provider": "archive",
+          "package": "tool.lazydocker"
+        },
+        "linux": {
+          "provider": "archive",
+          "package": "tool.lazydocker"
+        },
+        "windows": {
+          "provider": "archive",
+          "package": "tool.lazydocker"
         }
       }
     },
@@ -2028,6 +2062,15 @@
       "name": "lazygit configuration",
       "requires": [
         "tool.lazygit"
+      ],
+      "action": "config",
+      "scope": "user"
+    },
+    {
+      "id": "config.lazydocker",
+      "name": "lazydocker configuration",
+      "requires": [
+        "tool.lazydocker"
       ],
       "action": "config",
       "scope": "user"

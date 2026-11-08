@@ -123,6 +123,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Shell essentials | zsh on macOS/Linux or PowerShell 7 on Windows; zsh from bash terminals; Starship, lsd, zoxide, fzf, ripgrep, fd, Atuin, superfile |
 | Version control | Git, lazygit, GitHub CLI, gh-dash, GitLab CLI |
 | Cloud | Azure CLI |
+| Containers | lazydocker |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
 | AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Pi coding agent, Sentinel rules and skills |
@@ -164,6 +165,7 @@ required dependencies are still resolved automatically in the preview.
 | gh-dash | ✓ | ✓ | ✓ |
 | GitLab CLI | ✓ | ✓ | ✓ |
 | Azure CLI | ✓ | glibc | ✓ |
+| lazydocker | ✓ | ✓ | ✓ |
 | T3 Code | ✓ | ✓ | ✓ |
 | T3 Code server (browser UI) | ✓ | ✓ | ✓ |
 | Claude Code CLI | ✓ | ✓ | ✓ |
@@ -992,6 +994,19 @@ Useful standalone tools:
 - `lazygit`: terminal Git UI with upstream default keybindings and the Rose Pine
   theme on every OS.
   Press `?` for keys in the current context; `Esc` closes help and popups.
+- `lazydocker`: terminal UI for containers, images, volumes and networks, with
+  the Rose Pine colors of lazygit. `[` and `]` change the tab, `x` opens the
+  commands of the current item and `q` quits. Setup does not install Docker or
+  Podman. lazydocker uses the Docker socket, or the socket in `DOCKER_HOST`. For
+  Podman on Linux, run `systemctl --user enable --now podman.socket` one time,
+  then add `export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"` to
+  `~/.zshrc.local`. On macOS and Windows, `podman machine start` shows how
+  Docker API clients connect, with the `DOCKER_HOST` value when one is
+  necessary. With Podman, the Compose services panel is partial (upstream issues
+  #556 and #676). Config: `~/.config/lazydocker` on Linux,
+  `~/Library/Application Support/lazydocker` on macOS and `%APPDATA%\lazydocker`
+  on Windows. If a `jesseduffield/lazydocker` folder exists in that parent
+  folder, lazydocker reads it and not the managed file.
 - `gh`: on macOS and Linux, the managed shell sets `GH_PATH` to the stable
   `current/bin/gh` link. Thus the Git credential helper that `gh auth login`
   or `gh auth setup-git` writes still works after an Update. A helper line
@@ -1139,7 +1154,7 @@ successful local checks do not establish current live GitHub settings.
 | `nvim/`, `tmux/`, `herdr/` | Editor and multiplexer configuration |
 | `installer/shells/` | Active shell integration recipes |
 | `ghostty/`, `windows-terminal/`, `aerospace/`, `xremap/`, `xcompose/` | Desktop configuration |
-| `git/`, `lazygit/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/`, `t3/` | Tool configuration |
+| `git/`, `lazygit/config.yml`, `lazydocker/config.yml`, `gh-dash/`, `starship/`, `lsd/`, `atuin/`, `superfile/`, `t3/` | Tool configuration |
 | `tests/`, `.github/workflows/` | Local and native verification |
 | `docs/` | Upgrade, release and security guides, and release notes |
 

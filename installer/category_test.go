@@ -31,7 +31,7 @@ func TestCapabilityCategoriesFollowPlatformAvailability(t *testing.T) {
 					categories = append(categories, choice.Category)
 				}
 			}
-			wantCategories := []string{"Editors", "Shell essentials", "Version control", "Cloud", "Terminal apps", "Terminal sessions", "AI coding", "Desktop apps", "Dotfiles development"}
+			wantCategories := []string{"Editors", "Shell essentials", "Version control", "Cloud", "Containers", "Terminal apps", "Terminal sessions", "AI coding", "Desktop apps", "Dotfiles development"}
 			if target.OS == "windows" {
 				wantCategories = slices.DeleteFunc(wantCategories, func(category string) bool { return category == "Desktop apps" })
 			}
@@ -100,8 +100,6 @@ func TestCategorizedSelectionStartsFromExistingLeafSelections(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Add display metadata after saving an old selection. No state migration is
-	// needed, and unselected siblings must never enter the removal category.
 	for i := range c.Catalog.Resources {
 		if c.Catalog.Resources[i].Capability {
 			c.Catalog.Resources[i].Category = "Tools"
@@ -151,8 +149,6 @@ func TestCategorizedOwnershipDecisionsRemainFlat(t *testing.T) {
 				c, _ = adoptionFixture(t)
 				resource = "plugins"
 			}
-			// Give the resource in the ownership prompt its own category, so
-			// copying metadata there would fail the scripted interaction guard.
 			for i := range c.Catalog.Resources {
 				r := &c.Catalog.Resources[i]
 				if r.ID == resource {

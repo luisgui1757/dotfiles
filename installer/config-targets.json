@@ -227,6 +227,33 @@
       ]
     },
     {
+      "resource": "config.lazydocker",
+      "source": "lazydocker/config.yml",
+      "folder": "home",
+      "path": "Library/Application Support/lazydocker/config.yml",
+      "platforms": [
+        "darwin"
+      ]
+    },
+    {
+      "resource": "config.lazydocker",
+      "source": "lazydocker/config.yml",
+      "folder": "config",
+      "path": "lazydocker/config.yml",
+      "platforms": [
+        "linux"
+      ]
+    },
+    {
+      "resource": "config.lazydocker",
+      "source": "lazydocker/config.yml",
+      "folder": "app_data",
+      "path": "lazydocker/config.yml",
+      "platforms": [
+        "windows"
+      ]
+    },
+    {
       "resource": "config.ghostty",
       "source": "ghostty/config",
       "folder": "home",

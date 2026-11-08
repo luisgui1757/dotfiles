@@ -59,6 +59,7 @@ regex|installer/archive-pins.json|github-releases|equalsraf/win32yank|1
 regex|installer/archive-pins.json|github-releases|git-for-windows/git|1
 regex|installer/archive-pins.json|github-releases|github/copilot-cli|4
 regex|installer/archive-pins.json|github-releases|herdrdev/herdr|4
+regex|installer/archive-pins.json|github-releases|jesseduffield/lazydocker|4
 regex|installer/archive-pins.json|github-releases|jesseduffield/lazygit|4
 regex|installer/archive-pins.json|github-releases|jqlang/jq|4
 regex|installer/archive-pins.json|github-releases|junegunn/fzf|4

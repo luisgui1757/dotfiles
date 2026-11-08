@@ -90,6 +90,16 @@
         "windows/amd64": "lazygit_{version}_windows_x86_64.zip"
       }
     },
+    "tool.lazydocker": {
+      "repository": "jesseduffield/lazydocker",
+      "tag": "v{version}",
+      "assets": {
+        "darwin/arm64": "lazydocker_{version}_Darwin_arm64.tar.gz",
+        "linux/arm64": "lazydocker_{version}_Linux_arm64.tar.gz",
+        "linux/amd64": "lazydocker_{version}_Linux_x86_64.tar.gz",
+        "windows/amd64": "lazydocker_{version}_Windows_x86_64.zip"
+      }
+    },
     "tool.jq": {
       "repository": "jqlang/jq",
       "tag": "jq-{version}",
