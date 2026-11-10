@@ -53,9 +53,9 @@
     },
     "tool.fzf": {
       "darwin/arm64": {
-        "version": "0.74.5",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-darwin_arm64.tar.gz",
-        "sha256": "ada808c7401b9949ce8842274ac16a6b6193fd32dcada396884a6a9a89e5985a",
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-darwin_arm64.tar.gz",
+        "sha256": "1e76698eb481436e42119bea6aa6e2bd9552ff090789d769c286e3c3a4e0ded6",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -65,9 +65,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "0.74.5",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-windows_amd64.zip",
-        "sha256": "01f854ec8b9b47c99a7d78023638f7d2056cfb0af56b72dabd112032eed3993e",
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-windows_amd64.zip",
+        "sha256": "e3fb809d48094bea7f9f4df03b2fea33ae6e28a6cd32fdad9970cd79e1103901",
         "format": "zip",
         "commands": {
           "fzf": "fzf.exe"
@@ -77,9 +77,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.74.5",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-linux_arm64.tar.gz",
-        "sha256": "cf058001da21724a469b714a29cf4aab9cbe860d218a0d6c1b5b661efad7784c",
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-linux_arm64.tar.gz",
+        "sha256": "bd0717badb6a5620387e014bb94209aac4d9eab6ab77b5348eabb0833aeb4d59",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -89,9 +89,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.74.5",
-        "url": "https://github.com/junegunn/fzf/releases/download/v0.74.5/fzf-0.74.5-linux_amd64.tar.gz",
-        "sha256": "d47d7f882972c7d674dbbba998ffa4116e68379616ffac7695d0671e9a722c5f",
+        "version": "0.75.0",
+        "url": "https://github.com/junegunn/fzf/releases/download/v0.75.0/fzf-0.75.0-linux_amd64.tar.gz",
+        "sha256": "0d6640f83582d991cf429754baad64b07e3a4e439a6019670f4b91da1314141c",
         "format": "tar.gz",
         "commands": {
           "fzf": "fzf"
@@ -103,9 +103,9 @@
     },
     "tool.fd": {
       "darwin/arm64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-apple-darwin.tar.gz",
-        "sha256": "b67e1836c468e42e411984b56e52fa7abec08c2bd22c867398e7cc134aac5e12",
+        "version": "10.5.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.2/fd-v10.5.2-aarch64-apple-darwin.tar.gz",
+        "sha256": "81bf98a16d3d7230e4a9123fcede243d71ea31a577113476ed43f1cdf4773162",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -116,9 +116,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "d76c4317f7d5dba69f8a2a15856c90c777e7f0dd4e85f0de8c76de6992c374d4",
+        "version": "10.5.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.2/fd-v10.5.2-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "63ea52cb31586e6d98efa2f06d73d542f16c7d0c4af0f07b579aaf9714cf907a",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -129,9 +129,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-pc-windows-msvc.zip",
-        "sha256": "a227701b8551c35a9931d9f6da75503cf86d88e182d71fb849a70864c5d57cd7",
+        "version": "10.5.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.2/fd-v10.5.2-x86_64-pc-windows-msvc.zip",
+        "sha256": "7edac75ef96b7e9a01ebb251a21ee86ea365a09adcfb865f1ec3346a906153b6",
         "format": "zip",
         "commands": {
           "fd": "fd.exe"
@@ -142,9 +142,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "10.5.0",
-        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.0/fd-v10.5.0-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "761c72dc8e120d85b22292063be8a796e2eeb20eb3e4f38b8fa2343ccf3514a7",
+        "version": "10.5.2",
+        "url": "https://github.com/sharkdp/fd/releases/download/v10.5.2/fd-v10.5.2-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "7e2d07fa2b8807642aaec67b7e2972a9fbe4db26fcb340a7372392db42b26694",
         "format": "tar.gz",
         "commands": {
           "fd": "fd"
@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "edd06294377599bf4d85ca3337abc802256a991262260bdd980d1b649583553d",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "644e92d5667e2ebbc00758c71d5974bc907d238eaa6cdc32b24eb73dce7f9a5a",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "788cff5b3903ca7f1f5bdff3e4b4975c38b3c20385176a49b01ad1bea5b37636",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "54182762c9d91a4f779748f622749ff6963956db005feb13e62d037196b05618",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "7698bd70195bde165bb37ea3133aa6663dd48ff7d6a23042cda2c7be4c22ba78",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "b44b3f264652b847b2e524ec397aa498c13076ed75cf213239ed2b9a0de2f99d",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.4",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.4/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "773cb6a6538ac1f6d563abfe69c9a75e7e0455b5210d9ff071ef2b3f28368f3e",
+        "version": "18.24.5",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "8ec5f2519d8019c129d3fb83a6c97eca29aa23391d8802af306d0c6de8cde30e",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -789,9 +789,9 @@
     },
     "tool.lazygit": {
       "darwin/arm64": {
-        "version": "0.66.2",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_darwin_arm64.tar.gz",
-        "sha256": "fadda59ae7665ba556fcbaa704c7eade6e40d016d3f3b25d6327dd1f3f906a0c",
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_darwin_arm64.tar.gz",
+        "sha256": "6873e6b7a538b521c4d7ff3f76ec49e6dcafa41e6053a6aae33c12f62663e163",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -801,9 +801,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.66.2",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_linux_arm64.tar.gz",
-        "sha256": "79a3161eeb642f0473e23db6341f7baabd4a5933e921a9c1167c5d5c765c41a4",
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_linux_arm64.tar.gz",
+        "sha256": "ac0b48237f3d0283813e7154ec063237e519532feb0470c0881a1793ee78fd42",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -813,9 +813,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.66.2",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_linux_x86_64.tar.gz",
-        "sha256": "158efc9ddfa1241fab5fb3526bb442c8dc6c4b1904d73213b9e4e93e03c52034",
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_linux_x86_64.tar.gz",
+        "sha256": "0a23f429a95f0d09db298b3c291536d818de066aa5a85c255806f0490ff6656b",
         "format": "tar.gz",
         "commands": {
           "lazygit": "lazygit"
@@ -825,9 +825,9 @@
         ]
       },
       "windows/amd64": {
-        "version": "0.66.2",
-        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.2/lazygit_0.66.2_windows_x86_64.zip",
-        "sha256": "8b1e2194c2d8ac660f0a132cb4384e9d2fe1405217a144e280df16383c18d45c",
+        "version": "0.66.3",
+        "url": "https://github.com/jesseduffield/lazygit/releases/download/v0.66.3/lazygit_0.66.3_windows_x86_64.zip",
+        "sha256": "a76fe17339fd387c20addc09060f07c240e4b20a9f55fee4ad7c86a251c0741e",
         "format": "zip",
         "commands": {
           "lazygit": "lazygit.exe"
@@ -999,9 +999,9 @@
     },
     "tool.hyperfine": {
       "darwin/arm64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-apple-darwin.tar.gz",
-        "sha256": "8ee7067016620447c9d2d6234ec9a4680f958b7ad983549b56334668f63075b5",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-aarch64-apple-darwin.tar.gz",
+        "sha256": "4a6e8d9fad128557b31c471d81c60dd1576729c5ab2841998c457a3467ce4469",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -1012,9 +1012,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "3285ec7959285288137043dd81dce0dde056227018a8277532d9a364b4f03c2b",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "2c64127c1a0fc3bc58e365060b4d8a09e4632082e4dea843b8e4afb6a7b09f36",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -1025,9 +1025,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-aarch64-unknown-linux-gnu.tar.gz",
-        "sha256": "90875cb1db7a1d797c311174d061728361e58fc70e3b62262a00635ac3b1997c",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-aarch64-unknown-linux-gnu.tar.gz",
+        "sha256": "7c3e7183e4178e5c1bb68ef714fbf2ac1cef04d4d7fc751d645d290ac0041d7a",
         "format": "tar.gz",
         "commands": {
           "hyperfine": "hyperfine"
@@ -1039,9 +1039,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.20.0",
-        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.20.0/hyperfine-v1.20.0-x86_64-pc-windows-msvc.zip",
-        "sha256": "2508c549b049b1d4342d08edc1cb42bfac169082b6e3069431b5bab9822dbb32",
+        "version": "1.21.0",
+        "url": "https://github.com/sharkdp/hyperfine/releases/download/v1.21.0/hyperfine-v1.21.0-x86_64-pc-windows-msvc.zip",
+        "sha256": "c6b6d228a86250d355eba41d254585cbbe6ba5c1887e0a8df9ccda2e66836a3d",
         "format": "zip",
         "commands": {
           "hyperfine": "hyperfine.exe"
@@ -2955,9 +2955,9 @@
     },
     "tool.codex": {
       "darwin/arm64": {
-        "version": "0.166.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-darwin-arm64.tgz",
-        "sha256": "181d2eda8addbeca0b689c996df207293947928bdd9c88a097837ae1c7e69ca5",
+        "version": "0.167.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-darwin-arm64.tgz",
+        "sha256": "6989512a93d5fc74cb221dd348c972bf3cd83592e471bfd9557bccb45eb6fffc",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-apple-darwin/bin/codex",
@@ -2975,9 +2975,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "0.166.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-linux-x64.tgz",
-        "sha256": "cbc00a26d3d0e2ceefc4be8891f8a81ef1e349b3b175bc0ae308762bc001fd93",
+        "version": "0.167.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-linux-x64.tgz",
+        "sha256": "2dc9aa871abb513c3539d20d025f701faf1974c46ee906bda3a1e1f5026d4434",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
@@ -2996,9 +2996,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "0.166.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-linux-arm64.tgz",
-        "sha256": "9044e840397864fc6c539d13719b25fb26abb35d5353366cbabf7b4555406acd",
+        "version": "0.167.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-linux-arm64.tgz",
+        "sha256": "e24d7b6f0af5695a36c04692c3a79672bdadebcac7c44005259cb3cad36ac40e",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
@@ -3017,9 +3017,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "0.166.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.166.0-win32-x64.tgz",
-        "sha256": "47d74aed875a3c01315f042152329ae09b0bd9d26a3285802d1c85aeadce083e",
+        "version": "0.167.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-win32-x64.tgz",
+        "sha256": "075304c882f6618eb73037bdd1164f942516f214108540bdbb9130eff4ab1e08",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",
@@ -3161,9 +3161,9 @@
     },
     "tool.opencode": {
       "darwin/arm64": {
-        "version": "2.2.5",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-darwin-arm64.zip",
-        "sha256": "25ba9908979fa7d764792c82589b4b5768ab1511154e0317d98aa77d216ce767",
+        "version": "2.2.6",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-darwin-arm64.zip",
+        "sha256": "15491608f6b0bc4debe5eac35eab629a2b07ea9a1fbac68ad53bcea59fcc4b45",
         "format": "zip",
         "commands": {
           "opencode": "opencode"
@@ -3173,9 +3173,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.2.5",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-linux-x64-baseline.tar.gz",
-        "sha256": "09f44302c10fd036912f59c81fd1aef5df45dd06f649197f9dfc9bbe2a79614e",
+        "version": "2.2.6",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "08bb21d6326ce740d91cce7ebe88a6536933f6e1e30353b91a06b01f25da306c",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3186,9 +3186,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.2.5",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-linux-arm64.tar.gz",
-        "sha256": "5a528f42caf576c6cdece6a191eb273d3db54effa5518e0402684d8f8026aeb6",
+        "version": "2.2.6",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-arm64.tar.gz",
+        "sha256": "f2d27600c367e45057d6a16f6a5c2aa8d77b41a9b10d4bc3d849c2f88870e944",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3199,9 +3199,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "2.2.5",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.5/opencode-windows-x64-baseline.zip",
-        "sha256": "3acca208ad79add59aed13d07b7e08ddf24e0adbbb7f44a9131408d7b3ca67cd",
+        "version": "2.2.6",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-windows-x64-baseline.zip",
+        "sha256": "2f7e5e799b6c4937e4f725b69005a051e818a20132e3481ce69b412ed16183b0",
         "format": "zip",
         "commands": {
           "opencode": "opencode.exe"
@@ -3268,9 +3268,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.105",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-darwin-arm64.tar.gz",
-        "sha256": "34aacd03fb478d47e4b3cfc5ca045c37278c5d8d86239466521a16ea54ac84aa",
+        "version": "1.0.107",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-darwin-arm64.tar.gz",
+        "sha256": "85c58e1ba11a5869c9f5f59017571674ef6199e474c118caad3cb23ebe99448a",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3280,9 +3280,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.105",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-x64.tar.gz",
-        "sha256": "aba1f06f27bc0447656647f76e0a4cf58b4b2a341c75ff04a750982b6aeb6bd2",
+        "version": "1.0.107",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-linux-x64.tar.gz",
+        "sha256": "aff04181566f637010a88e68ea145ac1515ec596fae3890d06d81bb8c4be0c4e",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3293,9 +3293,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.105",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-linux-arm64.tar.gz",
-        "sha256": "e7b488cc04ac3e2ed800e1bf0aace33ada42dcf167529b3d2f48a61e1535a847",
+        "version": "1.0.107",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-linux-arm64.tar.gz",
+        "sha256": "28c9c911af64521821ba908dc1866bf4bfd1705cd9b3320abc2353704de952a0",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3306,9 +3306,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.105",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.105/copilot-win32-x64.zip",
-        "sha256": "34e16e9cf47de0e1534920171d6f39fa246638bddbb6ece820870b382bcc061a",
+        "version": "1.0.107",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-win32-x64.zip",
+        "sha256": "3056ce3acea5baeed0b61680df5296801dcd6d5e819dfe6ebdbd0ed385264430",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
