@@ -83,6 +83,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.pins = json.loads(self.original)["resources"]
         self.network = FakeNetwork()
         self.verified = []
+        self.copilot_releases = []
         self.publish_claude()
         self.publish_codex()
         self.publish_copilot()
@@ -122,8 +123,8 @@ class AgentCLIPinBumpTest(unittest.TestCase):
             releases[release] = {"dist": {"tarball": url, "integrity": sri(archive)}}
         self.network.texts["https://registry.npmjs.org/%40openai%2Fcodex"] = json.dumps({"dist-tags": tags, "versions": releases}).encode()
 
-    def publish_copilot(self):
-        version = self.versions["tool.copilot"]
+    def publish_copilot(self, age=datetime.timedelta(days=30), version=None):
+        version = version or self.versions["tool.copilot"]
         assets, sums = [], []
         for target, name in pins_script.COPILOT_ASSETS.items():
             pin = self.pins["tool.copilot"][target]
@@ -137,7 +138,10 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         sums_url = f"https://github.com/github/copilot-cli/releases/download/v{version}/SHA256SUMS.txt"
         assets.append({"name": "SHA256SUMS.txt", "browser_download_url": sums_url})
         self.network.texts[sums_url] = "\n".join(sums).encode()
-        self.network.texts["https://api.github.com/repos/github/copilot-cli/releases/latest"] = json.dumps({"tag_name": "v" + version, "prerelease": False, "assets": assets}).encode()
+        release = {"tag_name": "v" + version, "prerelease": False, "published_at": (NOW - age).isoformat(), "assets": assets}
+        self.copilot_releases.insert(0, release)
+        self.network.texts["https://api.github.com/repos/github/copilot-cli/releases/latest"] = json.dumps(release).encode()
+        self.network.texts["https://api.github.com/repos/github/copilot-cli/releases?per_page=100"] = json.dumps(self.copilot_releases).encode()
 
     def publish_kiro(self):
         version = self.versions["tool.kiro"]
@@ -167,7 +171,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         argv = ["--pins", str(self.pins_path), "--summary", str(summary), "--failures", str(failures)]
         argv += ["--tools", tools or ",".join(self.versions)]
         with mock.patch("builtins.print"):
-            self.assertEqual(pins_script.main(argv, network=self.network, verify=self.verify), expected_status)
+            self.assertEqual(pins_script.main(argv, network=self.network, verify=self.verify, now=NOW), expected_status)
         return json.loads(self.pins_path.read_text(encoding="utf-8"))["resources"], summary.read_text(encoding="utf-8"), failures.read_text(encoding="utf-8")
 
     def test_bumps_every_tool_after_its_vendor_verification(self):
@@ -244,6 +248,18 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         sums_url = "https://github.com/github/copilot-cli/releases/download/v1.1.0/SHA256SUMS.txt"
         self.network.texts[sums_url] = self.network.texts[sums_url].replace(b"copilot-win32-x64.zip", b"other.zip")
         self.assertOnlyToolFailed("tool.copilot", "SHA256SUMS.txt")
+
+    def test_copilot_release_waits_until_it_is_three_days_old(self):
+        self.copilot_releases.clear()
+        self.publish_copilot(age=datetime.timedelta(days=2))
+        resources, summary, _ = self.run_bump("tool.copilot")
+        self.assertEqual(resources["tool.copilot"], self.pins["tool.copilot"])
+        self.assertIn("1.1.0 is not three days old yet", summary)
+
+    def test_young_copilot_release_falls_back_to_the_newest_old_enough_release(self):
+        self.publish_copilot(version="1.2.0", age=datetime.timedelta(hours=1))
+        resources, _, _ = self.run_bump("tool.copilot")
+        self.assertEqual({pin["version"] for pin in resources["tool.copilot"].values()}, {"1.1.0"})
 
     def test_kiro_files_must_match_their_release_manifest(self):
         url = pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"
@@ -410,7 +426,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.98.0"})
 
     def test_github_release_without_a_publication_date_is_never_pinned(self):
-        for published in (None, "not a date", "2026-10-01T00:00:00"):
+        for published in (None, "not a date"):
             with self.subTest(published=published):
                 self.path.write_text(self.original)
                 self.releases.clear()

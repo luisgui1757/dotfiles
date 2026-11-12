@@ -12,7 +12,8 @@ pinned byte is verified the same way the reviewed pins were prepared:
 - Codex: each platform npm package must match its published SHA-512 integrity
   and still contain the pinned commands and required files.
 - Copilot CLI: each asset must match both its GitHub release digest and the
-  release's SHA256SUMS.txt, and still contain its single executable.
+  release's SHA256SUMS.txt, and still contain its single executable. The
+  release must be at least three days old.
 - Kiro CLI (macOS/Linux): each file must match the size and SHA-256 in Kiro's
   release manifest (no versioned manifest exists, so the current one is read at
   bump time and the pin records the fixed-version URL). Linux ZIPs keep their
@@ -25,7 +26,7 @@ Only version, URL and SHA-256 change; any other layout change fails that tool
 for manual review.
 GitHub recipes and manual exceptions are in archive-pin-updates.json.
 GitHub assets must match their published SHA-256 and the installed layout.
-A GitHub release must be at least three days old.
+A GitHub recipe release must be at least three days old.
 Network, signature checks and the clock are injectable for tests.
 """
 
@@ -257,10 +258,9 @@ def require_layout(tool: str, target: str, pin: dict, names: set) -> None:
 
 def released_before(release: dict, cutoff: datetime.datetime) -> bool:
     try:
-        published = datetime.datetime.fromisoformat(release["published_at"])
+        return datetime.datetime.fromisoformat(release["published_at"]) <= cutoff
     except (KeyError, TypeError, ValueError):
         return False
-    return published.tzinfo is not None and published <= cutoff
 
 
 def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict, held: list, now: datetime.datetime):
@@ -377,12 +377,26 @@ def codex(network, pins: dict, work: pathlib.Path):
     return version, updates
 
 
-def copilot(network, pins: dict, work: pathlib.Path):
-    release = network.json("https://api.github.com/repos/github/copilot-cli/releases/latest")
+def copilot(network, pins: dict, work: pathlib.Path, now: datetime.datetime):
+    api = "https://api.github.com/repos/github/copilot-cli/releases"
+    release = network.json(f"{api}/latest")
     if release.get("prerelease") or release.get("draft"):
         raise BumpError("Copilot CLI latest release is not a stable release")
     version = require_stable("Copilot CLI", release.get("tag_name", "").removeprefix("v"))
     check_version("tool.copilot", pins, version)
+    cutoff = now - MIN_RELEASE_AGE
+    if not released_before(release, cutoff):
+        def key(candidate):
+            return release_key("tool.copilot", candidate["tag_name"].removeprefix("v"))
+        pinned = max(release_key("tool.copilot", pin["version"]) for pin in pins["tool.copilot"].values())
+        newer = [candidate for candidate in network.json(f"{api}?per_page=100")
+                 if not candidate.get("prerelease") and not candidate.get("draft") and released_before(candidate, cutoff)
+                 and STABLE.fullmatch(candidate.get("tag_name", "").removeprefix("v")) and key(candidate) > pinned]
+        if not newer:
+            raise UnchangedRelease(f"{version} is not three days old yet")
+        release = max(newer, key=key)
+        version = release["tag_name"].removeprefix("v")
+        check_version("tool.copilot", pins, version)
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
     if "SHA256SUMS.txt" not in assets:
         raise BumpError("Copilot CLI release lacks SHA256SUMS.txt")
@@ -491,6 +505,8 @@ def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
                 pins = document["resources"]
                 if tool == "tool.claude":
                     version, updates = claude(network, pins, pathlib.Path(work), verify)
+                elif tool == "tool.copilot":
+                    version, updates = copilot(network, pins, pathlib.Path(work), now)
                 elif tool in policy["github"]:
                     version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool], held, now)
                 else:

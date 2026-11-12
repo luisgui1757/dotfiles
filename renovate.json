@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. It also lists new releases of the installer pins, the bootstrap toolchain, the Homebrew script and the Mason snapshot on the dashboard, but never changes them: they need checksum and runtime review. The daily agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. Major releases and explicit manual exceptions need manual review.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. It also lists new releases of the installer pins, the bootstrap toolchain, the Homebrew script and the Mason snapshot on the dashboard, but never changes them: they need checksum and runtime review. The daily agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. The pin workflow holds major releases. Explicit manual exceptions need manual review.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",

@@ -114,8 +114,8 @@ pin. Otherwise it proposes the highest stable release in the pinned major versio
 from the last 100 releases. It reports a newer major version and keeps the pin in
 its major version. It never downgrades a pin and refuses prereleases. A recipe
 can list release tags that the bot ignores, such as the stray xremap `v0.16.6`.
-A GitHub release must be at least three days old. Renovate also waits three days
-before it proposes a release.
+A GitHub recipe release and a Copilot release must be at least three days old.
+Renovate waits three days for each release that has a publication date.
 
 The PR must pass the native checks that protect `main`. The bot never merges.
 
