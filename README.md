@@ -389,10 +389,10 @@ permissions, credentials or sessions. Sign in from the chosen CLI after setup.
 Claude Code's managed shell environment sets `DISABLE_UPDATES=1`; use the
 installer's Update menu to reconcile reviewed pins for either CLI.
 **Keeping pinned tools current:** Update installs the checkout's versions.
-A weekly workflow proposes verified updates for the five agent CLIs and the
+A daily workflow proposes verified updates for the five agent CLIs and the
 GitHub tools in its update policy, including T3. It opens one grouped PR and
-holds major releases for review. Merge it after its native checks pass, then
-run `git pull` and **Update tools** on each machine. Some pins still need manual
+holds major releases for review. A scheduled maintenance agent merges it after
+its native checks pass. Then run `git pull` and **Update tools** on each machine. Some pins still need manual
 updates. See [coverage and exceptions](docs/security/supply-chain.md#archive-pin-proposals).
 **GitHub Copilot CLI** uses the pinned standalone build from its official GitHub
 release (one native executable; no npm, Node or install script). On Windows it

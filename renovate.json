@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. It also lists new releases of the installer pins, the bootstrap toolchain, the Homebrew script and the Mason snapshot on the dashboard, but never changes them: they need checksum and runtime review. The weekly agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. Major releases and explicit manual exceptions need manual review.",
+  "description": "Renovate owns GitHub Actions, runner labels, Go toolchain/modules and CI validator/tool constants. It also lists new releases of the installer pins, the bootstrap toolchain, the Homebrew script and the Mason snapshot on the dashboard, but never changes them: they need checksum and runtime review. The daily agent-cli-pins workflow proposes verified archive updates from scripts/archive-pin-updates.json in one PR. The pin workflow holds major releases. Explicit manual exceptions need manual review.",
   "extends": [
     "config:recommended",
     "helpers:pinGitHubActionDigests",
@@ -16,8 +16,10 @@
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
   "schedule": [
-    "before 06:00 on monday"
+    "before 06:00"
   ],
+  "minimumReleaseAge": "3 days",
+  "minimumReleaseAgeBehaviour": "timestamp-optional",
   "prConcurrentLimit": 4,
   "prHourlyLimit": 2,
   "labels": [
@@ -157,7 +159,7 @@
     },
     {
       "customType": "regex",
-      "description": "Release tag of each GitHub release download in the archive pins. Renovate only reports it; the weekly pin workflow or a manual PR changes the pin and its checksum.",
+      "description": "Release tag of each GitHub release download in the archive pins. Renovate only reports it; the daily pin workflow or a manual PR changes the pin and its checksum.",
       "managerFilePatterns": [
         "/^installer/archive-pins\\.json$/"
       ],
@@ -452,5 +454,5 @@
       "automerge": false
     }
   ],
-  "dependencyDashboardHeader": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The weekly agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
+  "dependencyDashboardHeader": "Pinned downloads (archive pins, Linux package pins, the bootstrap Go toolchain, the Homebrew script and the Mason snapshot) are listed under Pending Approval as notices. Do not approve them here: Renovate cannot verify their checksums. The daily agent-cli-pins workflow proposes verified updates, and docs/RELEASING.md describes the manual ones."
 }

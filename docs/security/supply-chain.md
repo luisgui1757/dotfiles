@@ -87,7 +87,7 @@ install stops. The native tests build the command with the
 
 ## Archive pin proposals
 
-The weekly [pin workflow](../../.github/workflows/agent-cli-pins.yml) opens one
+The daily [pin workflow](../../.github/workflows/agent-cli-pins.yml) opens one
 grouped PR. It updates the five agent CLIs and the GitHub tools listed in
 [the update policy](../../scripts/archive-pin-updates.json), including T3.
 Each GitHub recipe names the repository, release tag and asset for every target.
@@ -114,8 +114,19 @@ pin. Otherwise it proposes the highest stable release in the pinned major versio
 from the last 100 releases. It reports a newer major version and keeps the pin in
 its major version. It never downgrades a pin and refuses prereleases. A recipe
 can list release tags that the bot ignores, such as the stray xremap `v0.16.6`.
+A GitHub recipe release and a Copilot release must be at least three days old.
+Renovate waits three days for each release that has a publication date.
 
 The PR must pass the native checks that protect `main`. The bot never merges.
+
+A scheduled maintenance agent merges the pin and Renovate PRs for the owner. It
+merges a bot PR without a change only when the bot verified each tool and the
+required checks pass on a head that is current with `main`. When a bot PR fails,
+the agent replaces it with its own PR. That PR verifies each new SHA-256 against
+the digest of the publisher, moves coupled pins together and must pass the same
+native checks. For a file pinned by commit, the commit is the reference. This
+verification is the review of a pin change. The agent never pushes to a bot
+branch. It marks a PR that it cannot fix with the `needs-owner` label.
 
 The policy lists every archive resource as automatic or manual. CI rejects a
 resource without an entry, a stale entry, and a GitHub recipe with missing

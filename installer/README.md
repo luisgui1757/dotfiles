@@ -73,11 +73,11 @@ there only as an MSI installer, and setup neither runs that installer nor extrac
 programs from it (owner decision 2026-10-22). A plain Windows archive from Kiro
 would make it addable like the other targets.
 
-Agent CLI pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are proposed weekly by
+Agent CLI pins (Claude Code, Codex, Copilot CLI, Kiro CLI) are proposed daily by
 `.github/workflows/agent-cli-pins.yml` through `scripts/update-agent-cli-pins.py`,
 which verifies vendor signatures, integrity hashes and layouts before changing
-only version, URL and SHA-256; the pull request's native checks and the owner's
-merge remain the acceptance boundary.
+only version, URL and SHA-256; the pull request's native checks and the merge by
+the owner's scheduled maintenance agent remain the acceptance boundary.
 
 Sentinel rules and skills (`sentinel`) needs the hidden
 `integration.sentinel-installer` resource, which needs `tool.git`. Install and
