@@ -69,7 +69,7 @@ CI has four workflows:
 - `test.yml` runs the configuration tests on Ubuntu, macOS and Windows.
 - `installer-engine.yml` runs the installer core matrix and the native
   lifecycle jobs on disposable GitHub runners.
-- `agent-cli-pins.yml` proposes verified archive pin updates each week.
+- `agent-cli-pins.yml` proposes verified archive pin updates each day.
 - `release.yml` publishes the version in `release/manifest.json` when a merge
   changes it.
 
@@ -99,7 +99,8 @@ of each step. All of these checks must pass on the final head.
   input and keys typed early never approve.
 - Keep unrelated changes in a dirty worktree.
 - Merge and release publication are owner actions, unless the owner gives them
-  to you.
+  to you. The owner gives the merge of bot PRs (the pins App and Renovate), and
+  of the PRs that replace them, to the scheduled maintenance agent.
 
 ## Installer invariants
 

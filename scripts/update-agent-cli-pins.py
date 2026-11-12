@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Propose verified archive pin updates without major version changes.
 
-Claude Code, Codex, GitHub Copilot CLI, Kiro CLI and Muse Code move quickly, so a weekly
+Claude Code, Codex, GitHub Copilot CLI, Kiro CLI and Muse Code move quickly, so a daily
 workflow runs this script and proposes the result as a pull request. Every
 pinned byte is verified the same way the reviewed pins were prepared:
 
@@ -25,13 +25,15 @@ Only version, URL and SHA-256 change; any other layout change fails that tool
 for manual review.
 GitHub recipes and manual exceptions are in archive-pin-updates.json.
 GitHub assets must match their published SHA-256 and the installed layout.
-Network and signature checks are injectable for tests.
+A GitHub release must be at least three days old.
+Network, signature checks and the clock are injectable for tests.
 """
 
 from __future__ import annotations
 
 import argparse
 import base64
+import datetime
 import gzip
 import hashlib
 import http.client
@@ -68,6 +70,7 @@ MUSE_VERSION = re.compile(r"([0-9]+)\.([0-9]+)\.([0-9]+)-R([0-9]+)\.([0-9]+)")
 MUSE_FILES = {"darwin/arm64": ("aarch64_macos", "muse-aarch64-macos"), "linux/amd64": ("x86_linux", "muse-x86-linux"),
               "linux/arm64": ("aarch64_linux", "muse-aarch64-linux"), "windows/amd64": ("x86_windows", "muse-x86-windows.exe")}
 MAX_DOWNLOAD = 512 << 20
+MIN_RELEASE_AGE = datetime.timedelta(days=3)
 
 
 class BumpError(Exception):
@@ -252,7 +255,16 @@ def require_layout(tool: str, target: str, pin: dict, names: set) -> None:
         raise BumpError(f"{tool} on {target} changed its layout (missing {', '.join(missing)}); review the pin manually")
 
 
-def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict, held: list):
+def released_before(release: dict, cutoff: datetime.datetime) -> bool:
+    try:
+        published = datetime.datetime.fromisoformat(release["published_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+    return published.tzinfo is not None and published <= cutoff
+
+
+def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: dict, held: list, now: datetime.datetime):
+    cutoff = now - MIN_RELEASE_AGE
     pattern = re.escape(recipe["tag"]).replace(re.escape("{version}"), "(.+)")
 
     def stable(release):
@@ -267,7 +279,8 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
     majors = {int(pin["version"].split(".")[0]) for pin in pins[tool].values()}
     pinned = max(tuple(map(int, require_stable(tool, pin["version"]).split("."))) for pin in pins[tool].values())
     latest = stable(network.json(f"{api}/latest"))
-    if latest and latest[0][0] in majors and latest[0] >= pinned:
+    current = latest and latest[0][0] in majors and latest[0] >= pinned
+    if current and released_before(latest[2], cutoff):
         _, version, release = latest
     else:
         if latest and latest[0][0] > max(majors):
@@ -278,9 +291,13 @@ def github_release(network, pins: dict, work: pathlib.Path, tool: str, recipe: d
             if latest:
                 raise UnchangedRelease("no newer release in the pinned major version")
             raise BumpError(f"{tool} has no stable release that matches its recipe")
-        best, version, release = max(eligible, key=lambda candidate: candidate[0])
-        if best < pinned:
+        best = max((candidate for candidate in eligible if released_before(candidate[2], cutoff)),
+                   key=lambda candidate: candidate[0], default=None)
+        if current and (not best or best[0] <= pinned):
+            raise UnchangedRelease(f"{latest[1]} is not three days old yet")
+        if not best or best[0] < pinned:
             raise UnchangedRelease("no release in the pinned major version is newer than the pin")
+        _, version, release = best
     check_version(tool, pins, version)
     assets = {asset["name"]: asset for asset in release.get("assets", [])}
     updates = {}
@@ -443,7 +460,7 @@ def apply_updates(pins: dict, tool: str, updates: dict) -> None:
         current[target].update(fields)
 
 
-def main(argv=None, network=None, verify=gpg_verify) -> int:
+def main(argv=None, network=None, verify=gpg_verify, now=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--pins", type=pathlib.Path, default=PINS)
     parser.add_argument("--tools")
@@ -452,6 +469,7 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
     parser.add_argument("--failures", type=pathlib.Path)
     args = parser.parse_args(argv)
     network = network or Network(os.environ.get("GITHUB_TOKEN", ""))
+    now = now or datetime.datetime.now(datetime.timezone.utc)
     document = json.loads(args.pins.read_text(encoding="utf-8"))
     policy = json.loads(POLICY.read_text(encoding="utf-8"))
     try:
@@ -474,7 +492,7 @@ def main(argv=None, network=None, verify=gpg_verify) -> int:
                 if tool == "tool.claude":
                     version, updates = claude(network, pins, pathlib.Path(work), verify)
                 elif tool in policy["github"]:
-                    version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool], held)
+                    version, updates = github_release(network, pins, pathlib.Path(work), tool, policy["github"][tool], held, now)
                 else:
                     version, updates = BUMPERS[tool](network, pins, pathlib.Path(work))
             apply_updates(document, tool, updates)

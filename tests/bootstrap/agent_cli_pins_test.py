@@ -2,6 +2,7 @@
 
 import base64
 import copy
+import datetime
 import gzip
 import hashlib
 import http.client
@@ -23,6 +24,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SPEC = importlib.util.spec_from_file_location("update_agent_cli_pins", ROOT / "scripts" / "update-agent-cli-pins.py")
 pins_script = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pins_script)
+NOW = datetime.datetime(2026, 11, 12, 6, 0, tzinfo=datetime.timezone.utc)
 
 
 def tgz(files):
@@ -280,7 +282,7 @@ class GitHubPinBumpTest(unittest.TestCase):
         self.network = FakeNetwork()
         self.releases = []
 
-    def publish(self, tool, version):
+    def publish(self, tool, version, age=datetime.timedelta(days=30)):
         recipe = self.policy["github"][tool]
         assets = []
         for target, pin in self.pins[tool].items():
@@ -298,7 +300,8 @@ class GitHubPinBumpTest(unittest.TestCase):
                 data = tgz(files)
             self.network.files[url] = data
             assets.append({"name": name, "browser_download_url": url, "digest": "sha256:" + hashlib.sha256(data).hexdigest()})
-        self.release = {"tag_name": recipe['tag'].format(version=version), "draft": False, "prerelease": False, "assets": assets}
+        self.release = {"tag_name": recipe['tag'].format(version=version), "draft": False, "prerelease": False,
+                        "published_at": (NOW - age).isoformat().replace("+00:00", "Z"), "assets": assets}
         self.releases.insert(0, self.release)
         self.api = f"https://api.github.com/repos/{recipe['repository']}/releases?per_page=100"
         self.sync()
@@ -310,7 +313,7 @@ class GitHubPinBumpTest(unittest.TestCase):
     def run_bump(self, tool, expected=0):
         summary = self.path.with_suffix(".md")
         with mock.patch("builtins.print"):
-            result = pins_script.main(["--pins", str(self.path), "--tools", tool, "--summary", str(summary)], network=self.network)
+            result = pins_script.main(["--pins", str(self.path), "--tools", tool, "--summary", str(summary)], network=self.network, now=NOW)
         self.assertEqual(result, expected)
         return json.loads(self.path.read_text())["resources"], summary.read_text()
 
@@ -386,6 +389,36 @@ class GitHubPinBumpTest(unittest.TestCase):
         resources, summary = self.run_bump("tool.fzf")
         self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.99.0"})
         self.assertIn("1.0.0 held", summary)
+
+    def test_github_release_waits_until_it_is_three_days_old(self):
+        for age, expected in [(datetime.timedelta(days=3) - datetime.timedelta(seconds=1), None), (datetime.timedelta(days=3), "0.99.0")]:
+            with self.subTest(age=age):
+                self.path.write_text(self.original)
+                self.releases.clear()
+                self.publish("tool.fzf", "0.99.0", age=age)
+                resources, summary = self.run_bump("tool.fzf")
+                if expected:
+                    self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {expected})
+                else:
+                    self.assertEqual(resources, self.pins)
+                    self.assertIn("0.99.0 is not three days old yet", summary)
+
+    def test_young_latest_release_falls_back_to_the_newest_old_enough_release(self):
+        self.publish("tool.fzf", "0.98.0")
+        self.publish("tool.fzf", "0.99.0", age=datetime.timedelta(hours=1))
+        resources, _ = self.run_bump("tool.fzf")
+        self.assertEqual({pin["version"] for pin in resources["tool.fzf"].values()}, {"0.98.0"})
+
+    def test_github_release_without_a_publication_date_is_never_pinned(self):
+        for published in (None, "not a date", "2026-10-01T00:00:00"):
+            with self.subTest(published=published):
+                self.path.write_text(self.original)
+                self.releases.clear()
+                self.publish("tool.fzf", "0.99.0")
+                self.release["published_at"] = published
+                self.sync()
+                resources, _ = self.run_bump("tool.fzf")
+                self.assertEqual(resources, self.pins)
 
     def test_github_assets_respect_the_installer_download_limit(self):
         for size, status in [(536_870_912, 0), (536_870_913, 1), (538_725_004, 1)]:
