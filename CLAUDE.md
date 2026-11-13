@@ -99,8 +99,9 @@ of each step. All of these checks must pass on the final head.
   input and keys typed early never approve.
 - Keep unrelated changes in a dirty worktree.
 - Merge and release publication are owner actions, unless the owner gives them
-  to you. The owner gives the merge of bot PRs (the pins App and Renovate), and
-  of the PRs that replace them, to the scheduled maintenance agent.
+  to you. The owner gives all Renovate work to the scheduled maintenance agent:
+  the merge of bot PRs (the pins App and Renovate), of the PRs that replace
+  them, and of the PRs that update the items of the Renovate dashboard.
 
 ## Installer invariants
 

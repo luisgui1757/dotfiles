@@ -128,6 +128,14 @@ native checks. For a file pinned by commit, the commit is the reference. This
 verification is the review of a pin change. The agent never pushes to a bot
 branch. It marks a PR that it cannot fix with the `needs-owner` label.
 
+The agent also clears the Renovate dashboard. For each item under Pending
+Approval or PR Closed (Blocked) that no bot PR covers, it opens its own PR with
+the same checks. A major update also needs a model review, and the agent
+changes the code that the major needs. The agent never approves a dashboard
+item. When `main` has the update, Renovate removes the item. For an item that
+needs an owner decision or still fails after one fix, the agent opens an issue
+with the `needs-owner` label.
+
 The policy lists every archive resource as automatic or manual. CI rejects a
 resource without an entry, a stale entry, and a GitHub recipe with missing
 targets. Manual entries include nested components and wheels. The job summary
@@ -142,9 +150,9 @@ under Pending Approval as a notice:
   and the Mason snapshot
 
 Do not approve these entries: Renovate cannot verify their checksums. The bot
-updates its recipes. Update the other pins manually. The agent CLIs follow their
-vendor channels in the bot. Renovate has no source for Build Tools, the VC
-runtime and the Neovim plugin lock, so review them manually.
+updates its recipes. The maintenance agent updates the other pins. The agent
+CLIs follow their vendor channels in the bot. Renovate has no source for Build
+Tools, the VC runtime and the Neovim plugin lock, so review them manually.
 
 The bot does not overwrite the proposal branch when another person authored or
 committed a commit on it. Merge that PR, or save your changes and delete the

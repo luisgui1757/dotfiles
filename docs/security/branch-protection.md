@@ -6,8 +6,8 @@ installer cutover. On 2026-10-11, after explicit owner authorization and all 23
 checks passing at `45b8b38`, both required-check lists were changed from 12 to 23.
 Independent readback confirmed strict mode and Actions app `15368` in both
 layers, with unrelated policy preserved. Release remains an owner action. The
-owner gives the merge of bot PRs, and of the PRs that replace them, to the
-scheduled maintenance agent in
+owner gives the merge of bot PRs, of the PRs that replace them and of the PRs
+for the Renovate dashboard items to the scheduled maintenance agent in
 [archive pin proposals](supply-chain.md#archive-pin-proposals).
 Historical rollout evidence and the former Nix/chezmoi procedure remain
 in the [pre-retirement guide at an immutable commit](https://github.com/luisgui1757/dotfiles/blob/ae9a6446eb0a837a144d77d2a6345db967c61e4e/docs/security/branch-protection.md).
@@ -25,8 +25,9 @@ review and owner-updates layers are disabled on GitHub. The files in
 Keep these layers separate: review bypass must never bypass the integrity checks.
 Routine automation must use a separate GitHub App or bot identity without
 administration permission, not the owner's credentials. The one exception is the
-owner's scheduled maintenance agent. It merges bot PRs, and the PRs that replace
-them, with the owner's credentials only while the review and owner-updates
+owner's scheduled maintenance agent. It merges bot PRs, the PRs that replace
+them and the PRs for the Renovate dashboard items, with the owner's credentials
+only while the review and owner-updates
 layers are disabled. It never uses an administration action, `--admin` or a
 bypass. Branch protection does not prevent the personal-account owner from
 deleting the repository.
