@@ -501,17 +501,17 @@ Check, and repair installs the latest release, or v0.3.0 when the release
 lookup fails. Repair still needs Git access to GitHub.
 
 **Sentinel without attribution** adds `sentinel.attribution = off` to the
-marked block in your XDG Git config. It also applies the Git defaults
-`pull.rebase` and `fetch.prune`. With this value, the Sentinel rules tell
-agents to name no model, harness, skill or review tool in commits, branch
-names, PRs, PR comments or issues. Sentinel releases newer than v0.3.0 read
-the value. `a` and the AI coding category also tick this box. Untick it to
-keep the full attribution.
+marked block in your XDG Git config. It also installs Sentinel rules and
+skills and applies the Git defaults `pull.rebase` and `fetch.prune`. With
+this value, the Sentinel rules tell agents to name no model, harness, skill or
+review tool in commits, branch names, PRs, PR comments or issues. Sentinel
+releases newer than v0.3.0 read the value. `a` and the AI coding category also
+tick this box. Untick it to keep the full attribution.
 
 To change one repository, run `git config sentinel.attribution on` or `off`
 in it. Do not use `--global` for this value: it can edit the marked block.
-Run `git config --global sentinel.attribution off` to undo such an edit. To
-see the value of a repository, run
+When the box is ticked, `git config --global sentinel.attribution off` undoes
+such an edit. To see the value of a repository, run
 `git config --show-origin --get sentinel.attribution` in it. Only `off`
 removes the attribution. The `patrol` skill ignores the value, and so do
 branch names that an agent app creates, such as `t3/<id>`.
