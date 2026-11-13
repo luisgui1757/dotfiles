@@ -21,7 +21,7 @@ func TestWindowsGitXDGCheckoutOverlapIsResourceLocal(t *testing.T) {
 	}
 	d := c.Driver.(*NativeDriver)
 	d.shellSelection = nil
-	if err := configureGitSettings(d.Profiles, folders, filepath.Dir(filepath.Dir(source))); err != nil {
+	if err := configureGitSettings(d.Profiles, folders, filepath.Dir(filepath.Dir(source)), nil); err != nil {
 		t.Fatal(err)
 	}
 	preview, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})

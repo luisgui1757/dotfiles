@@ -21,13 +21,14 @@ type ProfileTarget struct{ Path, Script string }
 // never entire settings files. They share metadata-preserving publication.
 // Targets are explicit native paths. A profile redirect is not write authority.
 type ProfileDriver struct {
-	Directory   string
-	Targets     map[string][]ProfileTarget
-	Windows     bool
-	JSONFields  map[string][]string
-	GitDefaults string
-	GitIssue    string
-	Issues      map[string]string
+	Directory         string
+	Targets           map[string][]ProfileTarget
+	Windows           bool
+	JSONFields        map[string][]string
+	GitDefaults       string
+	GitIssue          string
+	GitAttributionOff bool
+	Issues            map[string]string
 }
 
 // A damaged resource-specific path or saved baseline cannot authorize writes,

@@ -6,18 +6,23 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
-const gitSettingsResource = "integration.git"
+const (
+	gitSettingsResource     = "integration.git"
+	gitAttributionOffChoice = "sentinel-no-attribution"
+)
 
 // Git reads XDG settings before ~/.gitconfig, and includes expand in place.
 // Prepending defaults here preserves both personal override layers. This file
 // stays regular and writable; --global never writes through an included file.
-func configureGitSettings(d *ProfileDriver, folders ConfigFolders, repository string) error {
+func configureGitSettings(d *ProfileDriver, folders ConfigFolders, repository string, selected []string) error {
 	d.GitIssue = folders.GitIssue
+	d.GitAttributionOff = slices.Contains(selected, gitAttributionOffChoice)
 	// The checkout source is independent of Git's discovered target. Bind it
 	// first so a saved target remains removable when discovery later fails.
 	source := filepath.Join(repository, "git", "config")
@@ -33,7 +38,7 @@ func configureGitSettings(d *ProfileDriver, folders ConfigFolders, repository st
 	if err != nil {
 		return err
 	}
-	d.Targets[gitSettingsResource] = []ProfileTarget{{Path: bound, Script: gitIncludeScript(source)}}
+	d.Targets[gitSettingsResource] = []ProfileTarget{{Path: bound, Script: gitIncludeScript(source, d.GitAttributionOff)}}
 	blockGitCheckoutOverlap(d, bound)
 	return nil
 }
@@ -42,12 +47,16 @@ func canonicalGitPath(value string) bool {
 	return utf8.ValidString(value) && filepath.IsAbs(value) && filepath.Clean(value) == value && !strings.ContainsFunc(value, unicode.IsControl)
 }
 
-func gitIncludeScript(source string) string {
+func gitIncludeScript(source string, attributionOff bool) string {
 	if source == "" {
 		return "" // No canonical source: removal remains possible, publication is blocked.
 	}
 	quoted := strings.NewReplacer("\\", "\\\\", "\"", "\\\"").Replace(filepath.ToSlash(source))
-	return "[include]\n\tpath = \"" + quoted + "\"\n"
+	script := "[include]\n\tpath = \"" + quoted + "\"\n"
+	if attributionOff {
+		script += "[sentinel]\n\tattribution = off\n"
+	}
+	return script
 }
 
 func blockGitCheckoutOverlap(d *ProfileDriver, target string) {
@@ -91,7 +100,7 @@ func retainGitSettingsTarget(d *ProfileDriver, state State) error {
 		d.GitIssue = strings.TrimSpace(d.GitIssue + " " + discovery)
 		d.Issues = maps.Clone(d.Issues)
 		delete(d.Issues, gitSettingsResource)
-		targets = []ProfileTarget{{Path: saved, Script: gitIncludeScript(d.GitDefaults)}}
+		targets = []ProfileTarget{{Path: saved, Script: gitIncludeScript(d.GitDefaults, d.GitAttributionOff)}}
 	} else if len(targets) != 1 {
 		return errors.New("Git settings require exactly one target")
 	} else if moved = targets[0].Path != saved && !(d.Windows && strings.EqualFold(targets[0].Path, saved)); moved {

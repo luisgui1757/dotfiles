@@ -12,8 +12,6 @@ import (
 	"testing"
 )
 
-// Exercise the real application's Git configuration route without installing
-// native packages on a contributor's machine. Git itself is a real subprocess.
 func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 	t.Helper()
 	root, err := resolveConfigPath(t.TempDir())
@@ -44,10 +42,8 @@ func gitSettingsFixture(t *testing.T) (Controller, string, string) {
 	}
 	catalog := &Catalog{Schema: 1}
 	for _, resource := range c.Catalog.Resources {
-		if slices.Contains([]string{"git", "integration.git"}, resource.ID) {
-			if !resource.Capability {
-				resource.Requires = nil
-			}
+		if slices.Contains([]string{"git", "sentinel-no-attribution", "integration.git"}, resource.ID) {
+			resource.Requires = slices.DeleteFunc(slices.Clone(resource.Requires), func(id string) bool { return id != "integration.git" })
 			catalog.Resources = append(catalog.Resources, resource)
 		}
 	}
@@ -187,6 +183,30 @@ func TestGitDefaultIncludePreservesPersonalPrecedence(t *testing.T) {
 				t.Fatal("Git removal changed the original personal configuration", runtime.GOOS, err)
 			}
 		})
+	}
+}
+
+func TestGitSentinelAttributionFollowsTheSelection(t *testing.T) {
+	c, _, _ := gitSettingsFixture(t)
+	attribution := func() string {
+		return gitSettingsCommand(t, c.Home, c.Home, "config", "--default", "unset", "--get", "sentinel.attribution")
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git", "sentinel-no-attribution"}})
+	if got := attribution(); got != "off" {
+		t.Fatal("the selection did not turn Sentinel attribution off", got)
+	}
+	check, err := c.Dispatch(context.Background(), Request{Schema: 1, Mode: "check"})
+	if err != nil || check.Status != "ready" {
+		t.Fatal("check rejected the applied attribution setting", check, err)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"git"}})
+	if got := attribution(); got != "unset" {
+		t.Fatal("unticking kept Sentinel attribution off", got)
+	}
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel-no-attribution"}})
+	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
+	if got := attribution(); got != "unset" {
+		t.Fatal("removal kept Sentinel attribution off", got)
 	}
 }
 
