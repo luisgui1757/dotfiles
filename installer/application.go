@@ -62,7 +62,7 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 	configureVSCodeSettings(profiles, target, folders)
 	configureKiroSettings(profiles, target, folders, platform.Sentinel)
 	configureT3Settings(profiles, folders, repository)
-	profiles.recordIssue(gitSettingsResource, configureGitSettings(profiles, folders, repository))
+	profiles.recordIssue(gitSettingsResource, configureGitSettings(profiles, folders, repository, nil))
 	windowsPowerShell := ""
 	if target.OS == "windows" {
 		windowsPowerShell, err = archives.CommandPath("tool.powershell", "pwsh")
@@ -155,7 +155,7 @@ func NewNativeController(repository, source, stateDirectory string, platform Nat
 		configureKiroSettings(bound, target, folders, platform.Sentinel)
 		configureT3Settings(bound, folders, repository)
 		if err == nil {
-			bound.recordIssue(gitSettingsResource, configureGitSettings(bound, folders, repository))
+			bound.recordIssue(gitSettingsResource, configureGitSettings(bound, folders, repository, selected))
 		}
 		if err == nil {
 			err = configureWindowsTerminal(bound, target, folders, repository, windowsPowerShell)

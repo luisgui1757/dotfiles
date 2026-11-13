@@ -447,6 +447,18 @@
       "scope": "user"
     },
     {
+      "id": "sentinel-no-attribution",
+      "name": "Sentinel without attribution",
+      "description": "Sets the Git value sentinel.attribution to off, so agents name no model, harness, skill or review tool in commits, branches, PRs, PR comments or issues",
+      "capability": true,
+      "category": "AI coding",
+      "requires": [
+        "integration.sentinel-installer",
+        "integration.git"
+      ],
+      "scope": "user"
+    },
+    {
       "id": "openwhispr",
       "name": "OpenWhispr",
       "description": "Voice dictation; Linux vendor launcher disables Chromium sandbox when user namespaces are restricted",

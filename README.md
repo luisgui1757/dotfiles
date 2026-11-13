@@ -126,7 +126,7 @@ selects the rest. Children remain independently selectable. `a` selects all,
 | Containers | lazydocker |
 | Terminal apps | Ghostty, Windows Terminal |
 | Terminal sessions | tmux, Herdr |
-| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Pi coding agent, Sentinel rules and skills |
+| AI coding | T3 Code, T3 Code server, Claude Code CLI, Codex CLI, GitHub Copilot CLI, Kiro CLI, Muse Code CLI, OpenCode CLI, Pi coding agent, Sentinel rules and skills, Sentinel without attribution |
 | Desktop apps | OpenWhispr, Obsidian, Tailscale, Zen Browser, AeroSpace, Mac keyboard shortcuts, US International dead keys |
 | Dotfiles development | Lint and benchmark tools |
 
@@ -176,6 +176,7 @@ required dependencies are still resolved automatically in the preview.
 | OpenCode CLI | ✓ | glibc | ✓ |
 | Pi coding agent | ✓ | glibc | ✓ |
 | Sentinel rules and skills | ✓ | ✓ | ✓ |
+| Sentinel without attribution | ✓ | ✓ | ✓ |
 | Lint and benchmark tools | ✓ | ✓ | ✓ |
 
 The table defines the product scope.
@@ -498,6 +499,23 @@ a note. A first install then stops. Repair, removal and an interrupted
 operation use the commit of the install. An install older than v0.3.0 fails
 Check, and repair installs the latest release, or v0.3.0 when the release
 lookup fails. Repair still needs Git access to GitHub.
+
+**Sentinel without attribution** adds `sentinel.attribution = off` to the
+marked block in your XDG Git config. It also installs Sentinel rules and
+skills and applies the Git defaults `pull.rebase` and `fetch.prune`. With
+this value, the Sentinel rules tell agents to name no model, harness, skill or
+review tool in commits, branch names, PRs, PR comments or issues. Sentinel
+releases newer than v0.3.0 read the value. `a` and the AI coding category also
+tick this box. Untick it to keep the full attribution. To remove Sentinel,
+untick both Sentinel boxes.
+
+To change one repository, run `git config sentinel.attribution on` or `off`
+in it. Do not use `--global` for this value: it can edit the marked block.
+When the box is ticked, `git config --global sentinel.attribution off` undoes
+such an edit. To see the value of a repository, run
+`git config --show-origin --get sentinel.attribution` in it. Only `off`
+removes the attribution. The `patrol` skill ignores the value, and so do
+branch names that an agent app creates, such as `t3/<id>`.
 
 Coming from dotfiles v1.0.0 or v1.0.1? Read
 [Sentinel rules and skills](docs/UPGRADING.md#sentinel-rules-and-skills).
