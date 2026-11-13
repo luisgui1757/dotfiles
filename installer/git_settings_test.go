@@ -204,6 +204,9 @@ func TestGitSentinelAttributionFollowsTheSelection(t *testing.T) {
 		t.Fatal("unticking kept Sentinel attribution off", got)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel-no-attribution"}})
+	if got := attribution(); got != "off" {
+		t.Fatal("ticking after an existing Git install kept the attribution", got)
+	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{}})
 	if got := attribution(); got != "unset" {
 		t.Fatal("removal kept Sentinel attribution off", got)

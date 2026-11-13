@@ -502,15 +502,18 @@ lookup fails. Repair still needs Git access to GitHub.
 
 **Sentinel without attribution** adds `sentinel.attribution = off` to the
 marked block in your XDG Git config. It also applies the Git defaults
-`pull.rebase` and `fetch.prune`.
-With this value, the Sentinel rules tell agents to name no model, harness,
-skill or review tool in commits, branch names, PRs, PR comments or issues.
-Sentinel releases newer than v0.3.0 read the value. Leave the box unticked to
-keep the full attribution. To change one repository, run
-`git config sentinel.attribution on` or `off` in it. Do not use `--global` for
-this value: it can edit the marked block. To see the value that a repository
-uses, run `git config --show-origin --get sentinel.attribution` in it. Only
-`off` removes the attribution. The `patrol` skill ignores the value, and so do
+`pull.rebase` and `fetch.prune`. With this value, the Sentinel rules tell
+agents to name no model, harness, skill or review tool in commits, branch
+names, PRs, PR comments or issues. Sentinel releases newer than v0.3.0 read
+the value. `a` and the AI coding category also tick this box. Untick it to
+keep the full attribution.
+
+To change one repository, run `git config sentinel.attribution on` or `off`
+in it. Do not use `--global` for this value: it can edit the marked block.
+Run `git config --global sentinel.attribution off` to undo such an edit. To
+see the value of a repository, run
+`git config --show-origin --get sentinel.attribution` in it. Only `off`
+removes the attribution. The `patrol` skill ignores the value, and so do
 branch names that an agent app creates, such as `t3/<id>`.
 
 Coming from dotfiles v1.0.0 or v1.0.1? Read
