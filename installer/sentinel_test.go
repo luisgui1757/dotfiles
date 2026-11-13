@@ -494,7 +494,7 @@ func TestSentinelResumesAnInterruptedInstall(t *testing.T) {
 	processes.install = nil
 	// A newer release appears before the resume. Resume finishes the recorded
 	// release, so it fetches no other commit.
-	processes.latest = sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	processes.latest = sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	d = sentinelNextRun(d)
 	c.Driver = d
 	retry := Request{Schema: 1, Mode: "apply", Retry: true}
@@ -520,7 +520,7 @@ func TestSentinelResumesAnInterruptedInstall(t *testing.T) {
 	processes.head = strings.Repeat("4", 40)
 	c.Driver = sentinelNextRun(d)
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "update"})
-	if record := sentinelRecorded(t, d); record.Commit != strings.Repeat("4", 40) || record.Tag != "v0.4.0" {
+	if record := sentinelRecorded(t, d); record.Commit != strings.Repeat("4", 40) || record.Tag != "v0.5.0" {
 		t.Fatal("the update after the resume did not install the newer release", record)
 	}
 	dispatchApproved(t, c, Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
@@ -540,11 +540,11 @@ func TestSentinelUpdateInstallsTheLatestRelease(t *testing.T) {
 		t.Fatal("apply did not install the latest release", record)
 	}
 
-	newer := sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	newer := sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	processes.latest, processes.head = newer, newer.Commit
 	d = sentinelNextRun(d)
 	o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
-	if err != nil || !o.Healthy || o.Desired != newer.Commit || !slices.ContainsFunc(o.Notes, func(note string) bool { return strings.Contains(note, "v0.4.0 is available") }) {
+	if err != nil || !o.Healthy || o.Desired != newer.Commit || !slices.ContainsFunc(o.Notes, func(note string) bool { return strings.Contains(note, "v0.5.0 is available") }) {
 		t.Fatal("a newer release is not a note on a healthy installation", o, err)
 	}
 	if action := sentinelAction(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}}); action != "keep" {
@@ -570,21 +570,21 @@ func TestSentinelKeepsTheInstalledReleaseWithoutAValidNewerOne(t *testing.T) {
 		t.Fatal("a failed lookup does not block the first install", o, err)
 	}
 
-	installed := sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	installed := sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	processes.latest, processes.failure, processes.head = installed, nil, installed.Commit
 	d = sentinelNextRun(d)
 	dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
 	for name, lookup := range map[string]func(){
 		"failed lookup": func() { processes.failure = errors.New("no network") },
 		"downgrade":     func() { processes.latest = sentinelFloor },
-		"moved tag":     func() { processes.latest = sentinelRelease{"v0.4.0", strings.Repeat("5", 40)} },
+		"moved tag":     func() { processes.latest = sentinelRelease{"v0.5.0", strings.Repeat("5", 40)} },
 		"old floor":     func() { processes.latest = sentinelRelease{"v0.2.0", strings.Repeat("2", 40)} },
 	} {
 		processes.latest, processes.failure = installed, nil
 		lookup()
 		d = sentinelNextRun(d)
 		o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
-		if err != nil || !o.Healthy || o.Desired != installed.Commit || !slices.ContainsFunc(o.Notes, func(note string) bool { return strings.Contains(note, "It keeps v0.4.0") }) {
+		if err != nil || !o.Healthy || o.Desired != installed.Commit || !slices.ContainsFunc(o.Notes, func(note string) bool { return strings.Contains(note, "It keeps v0.5.0") }) {
 			t.Fatal("setup does not keep the installed release", name, o, err)
 		}
 		if action := sentinelAction(t, sentinelController(d), Request{Schema: 1, Mode: "update"}); action != "keep" {
@@ -596,7 +596,7 @@ func TestSentinelKeepsTheInstalledReleaseWithoutAValidNewerOne(t *testing.T) {
 // Setup takes the latest release from GitHub only when it is published,
 // immutable and named vX.Y.Z, and it takes the commit of its tag.
 func TestSentinelAsksGitHubForAnImmutableRelease(t *testing.T) {
-	release := `{"tag_name":"v0.4.0","draft":false,"prerelease":false,"immutable":true}`
+	release := `{"tag_name":"v0.5.0","draft":false,"prerelease":false,"immutable":true}`
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/repos/owner/sentinel/releases/latest":
@@ -609,11 +609,11 @@ func TestSentinelAsksGitHubForAnImmutableRelease(t *testing.T) {
 	}))
 	defer server.Close()
 	for name, want := range map[string]string{
-		`{"tag_name":"v0.4.0","draft":false,"prerelease":false,"immutable":true}`:     "",
-		`{"tag_name":"v0.4.0","draft":false,"prerelease":false,"immutable":false}`:    "not a published and immutable",
-		`{"tag_name":"v0.4.0","draft":false,"prerelease":true,"immutable":true}`:      "not a published and immutable",
-		`{"tag_name":"v0.4.0-rc1","draft":false,"prerelease":false,"immutable":true}`: "not a published and immutable",
-		`{"tag_name":"v0.2.0","draft":false,"prerelease":false,"immutable":true}`:     "older than v0.3.0",
+		`{"tag_name":"v0.5.0","draft":false,"prerelease":false,"immutable":true}`:     "",
+		`{"tag_name":"v0.5.0","draft":false,"prerelease":false,"immutable":false}`:    "not a published and immutable",
+		`{"tag_name":"v0.5.0","draft":false,"prerelease":true,"immutable":true}`:      "not a published and immutable",
+		`{"tag_name":"v0.5.0-rc1","draft":false,"prerelease":false,"immutable":true}`: "not a published and immutable",
+		`{"tag_name":"v0.2.0","draft":false,"prerelease":false,"immutable":true}`:     "older than v0.4.0",
 	} {
 		release = name
 		d, _ := sentinelFixture(t, Context{OS: "linux", Arch: "amd64"})
@@ -638,7 +638,7 @@ func TestSentinelUpdateAfterARepairInstallsTheNewerRelease(t *testing.T) {
 	writeConfigFixture(t, filepath.Join(d.Home, ".codex", "config.toml"), "")
 	dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
 
-	newer := sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	newer := sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	processes.latest, processes.check = newer, 1
 	processes.install = func(nativeCommand) error { processes.check = 0; return nil }
 	d = sentinelNextRun(d)
@@ -667,7 +667,7 @@ func TestSentinelRecoveryKeepsTheInstalledCommitForTheNextUpdate(t *testing.T) {
 	if _, err := sentinelApply(t, d); err != nil {
 		t.Fatal(err)
 	}
-	processes.latest = sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	processes.latest = sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	d = sentinelNextRun(d)
 	r := Resource{ID: sentinelResource}
 	for status, want := range map[string]string{"in-progress": sentinelCommit, "needs-action": sentinelCommit, "ready": strings.Repeat("4", 40)} {
@@ -713,7 +713,7 @@ func TestSentinelUpdateAfterAWaitingUpdateInstallsTheNewerRelease(t *testing.T) 
 				t.Fatal("the update did not wait for the missing host", err)
 			}
 			writeConfigFixture(t, filepath.Join(codex, "config.toml"), "")
-			processes.latest, processes.head = sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}, strings.Repeat("4", 40)
+			processes.latest, processes.head = sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}, strings.Repeat("4", 40)
 			c.Driver = sentinelNextRun(d)
 			if recovery == "abandon" {
 				dispatchApproved(t, c, Request{Schema: 1, Mode: "abandon"})
@@ -751,7 +751,7 @@ func sentinelOlderInstall(t *testing.T, d *SentinelDriver, processes *sentinelPr
 // check. Repair installs the latest release, or the floor when the lookup
 // fails, and removal runs the floor installer.
 func TestSentinelRepairsAndRemovesAnInstallOlderThanTheFloor(t *testing.T) {
-	newer := sentinelRelease{"v0.4.0", strings.Repeat("4", 40)}
+	newer := sentinelRelease{"v0.5.0", strings.Repeat("4", 40)}
 	for name, test := range map[string]struct {
 		lookup func(*sentinelProcesses)
 		want   sentinelRelease
@@ -767,7 +767,7 @@ func TestSentinelRepairsAndRemovesAnInstallOlderThanTheFloor(t *testing.T) {
 			test.lookup(processes)
 			d = sentinelNextRun(d)
 			o, err := d.Observe(context.Background(), Resource{ID: sentinelResource}, Receipt{})
-			if err != nil || o.Healthy || !strings.Contains(o.HealthIssue, "older than v0.3.0") || o.Desired != test.want.Commit {
+			if err != nil || o.Healthy || !strings.Contains(o.HealthIssue, "older than v0.4.0") || o.Desired != test.want.Commit {
 				t.Fatal("an install older than the floor is not a repairable health issue", o, err)
 			}
 			dispatchApproved(t, sentinelController(d), Request{Schema: 1, Mode: "apply", Selected: []string{"sentinel"}})
