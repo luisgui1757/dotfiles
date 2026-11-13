@@ -13,6 +13,9 @@
     "custom.regex",
     "gomod"
   ],
+  "postUpdateOptions": [
+    "gomodTidy"
+  ],
   "dependencyDashboard": true,
   "dependencyDashboardTitle": "Renovate dashboard",
   "schedule": [
