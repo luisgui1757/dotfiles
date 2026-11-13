@@ -35,8 +35,8 @@ const (
 // sentinelFloorTag and sentinelCommit are the oldest Sentinel release that setup
 // installs and the commit of its tag. The tests install this release.
 const (
-	sentinelFloorTag = "v0.3.0"
-	sentinelCommit   = "c8beb70d6e568e0e8fe7ff6ee02675585958afbf"
+	sentinelFloorTag = "v0.4.0"
+	sentinelCommit   = "4c24718612672ed31902d1f18c84361c2fcf6661"
 )
 
 // sentinelFixedRelease makes the latest release the floor. Only the build tag

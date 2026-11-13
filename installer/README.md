@@ -83,7 +83,7 @@ Sentinel rules and skills (`sentinel`) needs the hidden
 `integration.sentinel-installer` resource, which needs `tool.git`. Install and
 update ask the GitHub API for the latest Sentinel release, which must be
 published, immutable and named `vX.Y.Z`, and for the commit of its tag. They
-refuse a release older than the floor in `sentinel.go` (v0.3.0), an older
+refuse a release older than the floor in `sentinel.go` (v0.4.0), an older
 release than the installed one, and a tag that names another commit. The plan
 binds the commit, and apply fetches that commit into `<state>/sentinel/checkout`.
 Git runs without system or global configuration. `HEAD` must equal the commit,

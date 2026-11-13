@@ -165,7 +165,7 @@ and skills for coding agents.
   resource. That resource needs `tool.git`.
 - Install and update take the latest Sentinel release from the GitHub API. It
   must be published, immutable and named `vX.Y.Z`. `installer/sentinel.go`
-  holds the floor release (v0.3.0) and its commit. Update refuses an older
+  holds the floor release (v0.4.0) and its commit. Update refuses an older
   release and a tag that names another commit. A newer release or a failed
   lookup is a note, not a health issue.
 - Apply fetches the commit of that release into `<state>/sentinel/checkout`.

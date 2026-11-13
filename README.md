@@ -442,7 +442,7 @@ T3 Code has its own Pi provider, which starts `pi` from `PATH`.
 **Sentinel rules and skills** installs
 [Sentinel](https://github.com/luisgui1757/sentinel), the shared rules and
 skills for coding agents. Setup gets the latest Sentinel release, never one
-older than v0.3.0, and runs the Sentinel installer of that release. That installer writes the rules
+older than v0.4.0, and runs the Sentinel installer of that release. That installer writes the rules
 into a managed block in the instruction file of each agent. Text outside the
 block stays. It also copies the skills of the `core`, `ui`, `formal` and `ops`
 profiles and writes a `.sentinel-owned` file into each skill folder. It does
@@ -496,8 +496,8 @@ Update refuses an older release and a tag that names another commit. An
 installed older commit moves only with **Update tools**. When
 setup cannot reach GitHub, Check and Update keep the installed release and show
 a note. A first install then stops. Repair, removal and an interrupted
-operation use the commit of the install. An install older than v0.3.0 fails
-Check, and repair installs the latest release, or v0.3.0 when the release
+operation use the commit of the install. An install older than v0.4.0 fails
+Check, and repair installs the latest release, or v0.4.0 when the release
 lookup fails. Repair still needs Git access to GitHub.
 
 **Sentinel without attribution** adds `sentinel.attribution = off` to the
@@ -505,7 +505,7 @@ marked block in your XDG Git config. It also installs Sentinel rules and
 skills and applies the Git defaults `pull.rebase` and `fetch.prune`. With
 this value, the Sentinel rules tell agents to name no model, harness, skill or
 review tool in commits, branch names, PRs, PR comments or issues. Sentinel
-releases newer than v0.3.0 read the value. `a` and the AI coding category also
+v0.4.0 and later read the value. `a` and the AI coding category also
 tick this box. Untick it to keep the full attribution. To remove Sentinel,
 untick both Sentinel boxes.
 

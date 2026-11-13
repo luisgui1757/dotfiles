@@ -45,7 +45,7 @@ Install and update ask the GitHub API for the latest release of the
 [Sentinel](https://github.com/luisgui1757/sentinel) repository. GitHub must
 report it as published and immutable, and its tag must be `vX.Y.Z`. A second
 request gives the commit of that tag. Setup refuses a release older than the
-floor in `installer/sentinel.go` (v0.3.0), an older release than the recorded
+floor in `installer/sentinel.go` (v0.4.0), an older release than the recorded
 one, and a tag that names another commit than the recorded one. The approved
 plan binds the commit. Apply runs these Git commands in
 `<state>/sentinel/checkout`:
