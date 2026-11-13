@@ -506,7 +506,8 @@ skills and applies the Git defaults `pull.rebase` and `fetch.prune`. With
 this value, the Sentinel rules tell agents to name no model, harness, skill or
 review tool in commits, branch names, PRs, PR comments or issues. Sentinel
 releases newer than v0.3.0 read the value. `a` and the AI coding category also
-tick this box. Untick it to keep the full attribution.
+tick this box. Untick it to keep the full attribution. To remove Sentinel,
+untick both Sentinel boxes.
 
 To change one repository, run `git config sentinel.attribution on` or `off`
 in it. Do not use `--global` for this value: it can edit the marked block.
