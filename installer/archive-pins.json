@@ -261,9 +261,9 @@
     },
     "tool.atuin": {
       "darwin/arm64": {
-        "version": "18.24.5",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-apple-darwin.tar.gz",
-        "sha256": "644e92d5667e2ebbc00758c71d5974bc907d238eaa6cdc32b24eb73dce7f9a5a",
+        "version": "18.24.6",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-aarch64-apple-darwin.tar.gz",
+        "sha256": "756b7d2f8cb919d29888ea52b2fb19aba92ed52ddbca456839088ccc63257f5b",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -274,9 +274,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "18.24.5",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-unknown-linux-musl.tar.gz",
-        "sha256": "54182762c9d91a4f779748f622749ff6963956db005feb13e62d037196b05618",
+        "version": "18.24.6",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-x86_64-unknown-linux-musl.tar.gz",
+        "sha256": "49b6e7a93cd6d8c77ee02bdb0eef0acff4c80ddaa0efb00c8179285771043698",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -287,9 +287,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "18.24.5",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-aarch64-unknown-linux-musl.tar.gz",
-        "sha256": "b44b3f264652b847b2e524ec397aa498c13076ed75cf213239ed2b9a0de2f99d",
+        "version": "18.24.6",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-aarch64-unknown-linux-musl.tar.gz",
+        "sha256": "0dcc72a06738f913040cdd990298a37d9ef062c8849026d0a3410d2def4c6bf7",
         "format": "tar.gz",
         "commands": {
           "atuin": "atuin"
@@ -300,9 +300,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "18.24.5",
-        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.5/atuin-x86_64-pc-windows-msvc.zip",
-        "sha256": "8ec5f2519d8019c129d3fb83a6c97eca29aa23391d8802af306d0c6de8cde30e",
+        "version": "18.24.6",
+        "url": "https://github.com/atuinsh/atuin/releases/download/v18.24.6/atuin-x86_64-pc-windows-msvc.zip",
+        "sha256": "d500e0dc85a85bb69513da6c9d933cf15dbeb2497ab404e0189ba47a5d829fe9",
         "format": "zip",
         "commands": {
           "atuin": "atuin.exe"
@@ -1158,9 +1158,9 @@
     },
     "tool.powershell": {
       "windows/amd64": {
-        "version": "7.6.9",
-        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.6.9/PowerShell-7.6.9-win-x64.zip",
-        "sha256": "ce7484804c0f0ad4dda10c958e71acdaf7eebfb22505c1b480f89e0e9f1da94d",
+        "version": "7.7.0",
+        "url": "https://github.com/PowerShell/PowerShell/releases/download/v7.7.0/PowerShell-7.7.0-win-x64.zip",
+        "sha256": "7c74e03b20a75b59715847439d046a6214b1863ee79b187872980f139bb4a05f",
         "format": "zip",
         "commands": {
           "pwsh": "pwsh.exe"
@@ -2875,9 +2875,9 @@
     },
     "tool.windows-terminal": {
       "windows/amd64": {
-        "version": "1.25.2733.0",
-        "url": "https://github.com/microsoft/terminal/releases/download/v1.25.2733.0/Microsoft.WindowsTerminal_1.25.2733.0_x64.zip",
-        "sha256": "bf3ef2012f6c44d8340a4c58125acc9498d19b580f9890dc043cdf831852e796",
+        "version": "1.25.3131.0",
+        "url": "https://github.com/microsoft/terminal/releases/download/v1.25.3131.0/Microsoft.WindowsTerminal_1.25.3131.0_x64.zip",
+        "sha256": "273d6f1502eca1b5bd95c43f5d4d7ec72cc503df340102f8659717e5bead3437",
         "format": "zip",
         "strip_components": 1,
         "commands": {
@@ -2955,9 +2955,9 @@
     },
     "tool.codex": {
       "darwin/arm64": {
-        "version": "0.167.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-darwin-arm64.tgz",
-        "sha256": "6989512a93d5fc74cb221dd348c972bf3cd83592e471bfd9557bccb45eb6fffc",
+        "version": "0.169.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-darwin-arm64.tgz",
+        "sha256": "d67d443253294438a21fde15753d7c1174e6a32147d842eb84428479d664c93d",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-apple-darwin/bin/codex",
@@ -2975,9 +2975,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "0.167.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-linux-x64.tgz",
-        "sha256": "2dc9aa871abb513c3539d20d025f701faf1974c46ee906bda3a1e1f5026d4434",
+        "version": "0.169.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-linux-x64.tgz",
+        "sha256": "89801b4b97faba562eb80fe0a833159ac79399be674022f4b1a0ccab1d153faa",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-unknown-linux-musl/bin/codex",
@@ -2996,9 +2996,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "0.167.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-linux-arm64.tgz",
-        "sha256": "e24d7b6f0af5695a36c04692c3a79672bdadebcac7c44005259cb3cad36ac40e",
+        "version": "0.169.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-linux-arm64.tgz",
+        "sha256": "c1555c8ad3913e703d736584ff15e98eaeda685bf6eaedc83ae15943badbc1ff",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/aarch64-unknown-linux-musl/bin/codex",
@@ -3017,9 +3017,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "0.167.0",
-        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.167.0-win32-x64.tgz",
-        "sha256": "075304c882f6618eb73037bdd1164f942516f214108540bdbb9130eff4ab1e08",
+        "version": "0.169.0",
+        "url": "https://registry.npmjs.org/@openai/codex/-/codex-0.169.0-win32-x64.tgz",
+        "sha256": "c48d07b46034d2b0a6c091227993c50e19c389680169244d0dcbb96c4ebc429f",
         "format": "tar.gz",
         "commands": {
           "codex": "vendor/x86_64-pc-windows-msvc/bin/codex.exe",
@@ -3107,9 +3107,9 @@
     },
     "tool.muse": {
       "darwin/arm64": {
-        "version": "1.4.14-R7309.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-macos",
-        "sha256": "1c96114408acbeade9a8fb79e3b4425e5b64d50425938568aef01bdc04ce2e03",
+        "version": "1.4.20-R8619.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-aarch64-macos",
+        "sha256": "89964f68f7f020896fc75679dc2f3975e5e15a6efe8537d91512a1b45ffb37aa",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3120,9 +3120,9 @@
         "file": "muse"
       },
       "linux/amd64": {
-        "version": "1.4.14-R7309.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-linux",
-        "sha256": "0809aac7cb58d18f5022b6d05e02aa1974683c0ec430e5f04d25b60ed17de2da",
+        "version": "1.4.20-R8619.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-x86-linux",
+        "sha256": "3685b023d45a1a07c8c559da00088bdf59564920b13a85adad11e13ad6f4d181",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3133,9 +3133,9 @@
         "file": "muse"
       },
       "linux/arm64": {
-        "version": "1.4.14-R7309.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-aarch64-linux",
-        "sha256": "3dc39b8fa26f9963cc2038f2966c0932ed5a39f0f9efb39cc0266a261cbbcf76",
+        "version": "1.4.20-R8619.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-aarch64-linux",
+        "sha256": "7159d6431fc5ff4c9dea32c62d0b771f5089d14389ec672ae903755bd39374dc",
         "format": "file",
         "commands": {
           "muse": "muse"
@@ -3146,9 +3146,9 @@
         "file": "muse"
       },
       "windows/amd64": {
-        "version": "1.4.14-R7309.1",
-        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.14-R7309.1&file=muse-x86-windows.exe",
-        "sha256": "20d18c426cc26e9e4b3cc07008ec07ec97e12e466a2be8cd2797b2e0e2018382",
+        "version": "1.4.20-R8619.1",
+        "url": "https://lookaside.facebook.com/lookaside/muse/download/?channel=muse&version=1.4.20-R8619.1&file=muse-x86-windows.exe",
+        "sha256": "2d223f7f992f02c313225ed47adf3dda24e7361b6b8389f2c19f7c12f026618a",
         "format": "file",
         "commands": {
           "muse": "muse.exe"
@@ -3161,9 +3161,9 @@
     },
     "tool.opencode": {
       "darwin/arm64": {
-        "version": "2.2.6",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-darwin-arm64.zip",
-        "sha256": "15491608f6b0bc4debe5eac35eab629a2b07ea9a1fbac68ad53bcea59fcc4b45",
+        "version": "2.2.7",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-darwin-arm64.zip",
+        "sha256": "811c42be9cad489ea8c411ead49e06f691deee4957ba9a0a56a159a7d6c1abdc",
         "format": "zip",
         "commands": {
           "opencode": "opencode"
@@ -3173,9 +3173,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.2.6",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-x64-baseline.tar.gz",
-        "sha256": "08bb21d6326ce740d91cce7ebe88a6536933f6e1e30353b91a06b01f25da306c",
+        "version": "2.2.7",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "89a6cee227b54bc011179c528a5e63176032462b1a5e21723b616801cddc2ca7",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3186,9 +3186,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.2.6",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-linux-arm64.tar.gz",
-        "sha256": "f2d27600c367e45057d6a16f6a5c2aa8d77b41a9b10d4bc3d849c2f88870e944",
+        "version": "2.2.7",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-linux-arm64.tar.gz",
+        "sha256": "c1682057f0815cb2abdd6e00305f1146ebaf1c167f0335cdb74ddc80008120e7",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3199,9 +3199,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "2.2.6",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.6/opencode-windows-x64-baseline.zip",
-        "sha256": "2f7e5e799b6c4937e4f725b69005a051e818a20132e3481ce69b412ed16183b0",
+        "version": "2.2.7",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.2.7/opencode-windows-x64-baseline.zip",
+        "sha256": "93323d0d6f72f9d1ba9f847e8002de71ace79bb5ea64f18d6b70bbbc30cc719e",
         "format": "zip",
         "commands": {
           "opencode": "opencode.exe"
@@ -3213,9 +3213,9 @@
     },
     "tool.pi": {
       "darwin/arm64": {
-        "version": "1.5.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-darwin-arm64.tar.gz",
-        "sha256": "a9bf0d82d58d2a7d337f4ae4171b5fc9ebffe42509527a831364c4b65adf2cdf",
+        "version": "1.5.2",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-darwin-arm64.tar.gz",
+        "sha256": "56b5e194d485ced555667b8ba3276157a8272e9ecde9e001e428af80985bdd9b",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3226,9 +3226,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "1.5.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-linux-x64.tar.gz",
-        "sha256": "df870ba0e344cb7b3358d8d8f19397b8b8d225a8669784736ad68a5c2169d53b",
+        "version": "1.5.2",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-linux-x64.tar.gz",
+        "sha256": "811c6f2c9e7aaee252b5404252e556fb713aa209c1f7f924226aa77d4ef70cb5",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3240,9 +3240,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.5.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-linux-arm64.tar.gz",
-        "sha256": "5d5711b48600756473682e86360b026b11abf7591e5d112eb411d4da2c100d9a",
+        "version": "1.5.2",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-linux-arm64.tar.gz",
+        "sha256": "42805cd5615952fcbbfc9c56b04f8feb84395134952e169a6cdc8d7676975666",
         "format": "tar.gz",
         "commands": {
           "pi": "pi"
@@ -3254,9 +3254,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.5.0",
-        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.0/pi-windows-x64.zip",
-        "sha256": "12d58a70e80b16ba9f764950b7a42bdeb07959495c0db68396cf2988c0b71af3",
+        "version": "1.5.2",
+        "url": "https://github.com/earendil-works/pi/releases/download/v1.5.2/pi-windows-x64.zip",
+        "sha256": "e6adb8cb8c84eca14391ad24b363de9d2be98a89ca3ba3fdee1fa4de32b7f2e8",
         "format": "zip",
         "commands": {
           "pi": "pi.exe"
@@ -3268,9 +3268,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.107",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-darwin-arm64.tar.gz",
-        "sha256": "85c58e1ba11a5869c9f5f59017571674ef6199e474c118caad3cb23ebe99448a",
+        "version": "1.0.109",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-darwin-arm64.tar.gz",
+        "sha256": "9c21ad663ce98f500c1f0b62e0a6d687bc1b1661e59f4c2161cc114515a01942",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3280,9 +3280,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.107",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-linux-x64.tar.gz",
-        "sha256": "aff04181566f637010a88e68ea145ac1515ec596fae3890d06d81bb8c4be0c4e",
+        "version": "1.0.109",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-linux-x64.tar.gz",
+        "sha256": "45a7f37e822e8c8725eda6b27deaed55dad2688ff4163ed27ec22e23293cb761",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3293,9 +3293,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.107",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-linux-arm64.tar.gz",
-        "sha256": "28c9c911af64521821ba908dc1866bf4bfd1705cd9b3320abc2353704de952a0",
+        "version": "1.0.109",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-linux-arm64.tar.gz",
+        "sha256": "679db06c3168457d8154cd8ce93b822f7c46d3169e61da4c0b78ac6e110c4af6",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3306,9 +3306,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.107",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.107/copilot-win32-x64.zip",
-        "sha256": "3056ce3acea5baeed0b61680df5296801dcd6d5e819dfe6ebdbd0ed385264430",
+        "version": "1.0.109",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.109/copilot-win32-x64.zip",
+        "sha256": "794c16bcc5535cdf478598d6cf4af3228daec3b7801bfa3540c56b8d3524beee",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
@@ -3477,9 +3477,9 @@
     },
     "tool.xremap": {
       "linux/amd64": {
-        "version": "0.15.17",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.17/xremap-linux-x86_64-full.zip",
-        "sha256": "820f3cc7c73a234275a1e6e41ac532cb1dfae5a32cd2a5849c3c869f755b123a",
+        "version": "0.15.18",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-x86_64-full.zip",
+        "sha256": "7500554a4bf0152685e5f0937cbf26a03d422bbe075193cf24d285bbde3aa6d3",
         "format": "zip",
         "commands": {
           "xremap": "xremap"
@@ -3489,9 +3489,9 @@
         ]
       },
       "linux/arm64": {
-        "version": "0.15.17",
-        "url": "https://github.com/xremap/xremap/releases/download/v0.15.17/xremap-linux-aarch64-full.zip",
-        "sha256": "1f403c06428b023ac786abfdc135d3daa8439835d21fb39ca19d43d1fee0f48a",
+        "version": "0.15.18",
+        "url": "https://github.com/xremap/xremap/releases/download/v0.15.18/xremap-linux-aarch64-full.zip",
+        "sha256": "11ca3b03e9474b398838df57575920399cc980f284fc6f6c18ab437dff7ab428",
         "format": "zip",
         "commands": {
           "xremap": "xremap"
@@ -3503,9 +3503,9 @@
     },
     "tool.t3": {
       "darwin/arm64": {
-        "version": "0.1.7",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-darwin-arm64.tar.gz",
-        "sha256": "fecfb296ed142942d0cb2dee1c53a6faca54a4012a312a470d4dc6c3215d1ab3",
+        "version": "0.1.8",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-darwin-arm64.tar.gz",
+        "sha256": "a95be61a0260f8daf62f0e218bd3e60386a6674d32a3fc46e2d3bc159f9b7daa",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3520,9 +3520,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.1.7",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-linux-x64.tar.gz",
-        "sha256": "c089892bf7922e2e73c6f44a5d1ea125c99f70e378c18361cbbed2fba1920e6c",
+        "version": "0.1.8",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-linux-x64.tar.gz",
+        "sha256": "b9c49dc00c23fbbc5961bdaff2d88e556d96c8dbd638c4501e2937c70650a9e5",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3538,9 +3538,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.1.7",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-linux-arm64.tar.gz",
-        "sha256": "5a528e23af394cc6f359036d3cb8441fda14129d477630fc6c53e4f4a1025bc8",
+        "version": "0.1.8",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-linux-arm64.tar.gz",
+        "sha256": "2bffbf608eef736c5c35e3431a7e5261d0c909e33d8a8feb83ef26a3747cf8f4",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3556,9 +3556,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.1.7",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.7/t3-0.1.7-win32-x64.zip",
-        "sha256": "ebbe1f42b774c1492039f7d3f0b0e9572926b16f887c94574eff4644549cd15a",
+        "version": "0.1.8",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-win32-x64.zip",
+        "sha256": "347066125898dd1fe0265816d0480b038a301973c0f85b6e49967c0e29710f3f",
         "format": "zip",
         "strip_components": 1,
         "commands": {
