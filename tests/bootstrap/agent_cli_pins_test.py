@@ -72,7 +72,7 @@ class FakeNetwork:
 
 
 class AgentCLIPinBumpTest(unittest.TestCase):
-    versions = {"tool.claude": "2.1.400", "tool.codex": "0.200.0", "tool.copilot": "1.1.0", "tool.kiro": "2.40.0", "tool.muse": "1.4.20-R8000.1"}
+    versions = {"tool.claude": "2.999.0", "tool.codex": "0.999.0", "tool.copilot": "1.999.0", "tool.kiro": "2.999.0", "tool.muse": "1.999.0-R99999.1"}
 
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
@@ -188,7 +188,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
                 unchanged = {key: value for key, value in pin.items() if key not in ("version", "url", "sha256")}
                 self.assertEqual(unchanged, {key: value for key, value in before.items() if key not in ("version", "url", "sha256")})
             self.assertIn(f"`{tool}`:", summary)
-        self.assertEqual(resources["tool.kiro"]["darwin/arm64"]["url"], pins_script.KIRO_BASE + "2.40.0/Kiro%20CLI.dmg")
+        self.assertEqual(resources["tool.kiro"]["darwin/arm64"]["url"], pins_script.KIRO_BASE + self.versions["tool.kiro"] + "/Kiro%20CLI.dmg")
 
     def test_current_versions_leave_the_pins_byte_identical(self):
         self.versions = {tool: sorted({pin["version"] for pin in self.pins[tool].values()})[0] for tool in self.versions}
@@ -219,33 +219,33 @@ class AgentCLIPinBumpTest(unittest.TestCase):
 
     def test_claude_binary_must_match_the_signed_manifest(self):
         base = pins_script.CLAUDE_RELEASES
-        manifest = json.loads(self.network.texts[f"{base}/2.1.400/manifest.json"])
+        manifest = json.loads(self.network.texts[f"{base}/{self.versions['tool.claude']}/manifest.json"])
         manifest["platforms"]["linux-x64"]["checksum"] = "0" * 64
-        self.network.texts[f"{base}/2.1.400/manifest.json"] = json.dumps(manifest).encode()
+        self.network.texts[f"{base}/{self.versions['tool.claude']}/manifest.json"] = json.dumps(manifest).encode()
         self.assertOnlyToolFailed("tool.claude", "does not match the signed manifest")
 
     def test_npm_packages_must_match_their_published_integrity(self):
-        url = "https://registry.npmjs.org/@openai/codex/-/codex-0.200.0-win32-x64.tgz"
+        url = f"https://registry.npmjs.org/@openai/codex/-/codex-{self.versions['tool.codex']}-win32-x64.tgz"
         self.network.files[url] += b"tampered"
         self.assertOnlyToolFailed("tool.codex", "SHA-512 integrity")
 
     def test_prereleases_are_never_pinned(self):
-        self.publish_codex("0.201.0-alpha.3")
+        self.publish_codex("0.1000.0-alpha.3")
         self.assertOnlyToolFailed("tool.codex", "not a plain release version")
 
     def test_codex_layout_changes_need_manual_review(self):
         target = "linux/amd64"
         pin = self.pins["tool.codex"][target]
         archive = tgz({"package/" + name: b"x" for name in layout(pin) if not name.endswith("bwrap")})
-        url = "https://registry.npmjs.org/@openai/codex/-/codex-0.200.0-linux-x64.tgz"
+        url = f"https://registry.npmjs.org/@openai/codex/-/codex-{self.versions['tool.codex']}-linux-x64.tgz"
         self.network.files[url] = archive
         document = json.loads(self.network.texts["https://registry.npmjs.org/%40openai%2Fcodex"])
-        document["versions"]["0.200.0-linux-x64"]["dist"]["integrity"] = sri(archive)
+        document["versions"][f"{self.versions['tool.codex']}-linux-x64"]["dist"]["integrity"] = sri(archive)
         self.network.texts["https://registry.npmjs.org/%40openai%2Fcodex"] = json.dumps(document).encode()
         self.assertOnlyToolFailed("tool.codex", "changed its layout")
 
     def test_copilot_assets_must_match_digest_and_sha256sums(self):
-        sums_url = "https://github.com/github/copilot-cli/releases/download/v1.1.0/SHA256SUMS.txt"
+        sums_url = f"https://github.com/github/copilot-cli/releases/download/v{self.versions['tool.copilot']}/SHA256SUMS.txt"
         self.network.texts[sums_url] = self.network.texts[sums_url].replace(b"copilot-win32-x64.zip", b"other.zip")
         self.assertOnlyToolFailed("tool.copilot", "SHA256SUMS.txt")
 
@@ -254,20 +254,20 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.publish_copilot(age=datetime.timedelta(days=2))
         resources, summary, _ = self.run_bump("tool.copilot")
         self.assertEqual(resources["tool.copilot"], self.pins["tool.copilot"])
-        self.assertIn("1.1.0 is not three days old yet", summary)
+        self.assertIn(f"{self.versions['tool.copilot']} is not three days old yet", summary)
 
     def test_young_copilot_release_falls_back_to_the_newest_old_enough_release(self):
-        self.publish_copilot(version="1.2.0", age=datetime.timedelta(hours=1))
+        self.publish_copilot(version="1.1000.0", age=datetime.timedelta(hours=1))
         resources, _, _ = self.run_bump("tool.copilot")
-        self.assertEqual({pin["version"] for pin in resources["tool.copilot"].values()}, {"1.1.0"})
+        self.assertEqual({pin["version"] for pin in resources["tool.copilot"].values()}, {self.versions["tool.copilot"]})
 
     def test_kiro_files_must_match_their_release_manifest(self):
-        url = pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"
+        url = pins_script.KIRO_BASE + self.versions["tool.kiro"] + "/kirocli-aarch64-linux.zip"
         self.network.files[url] = self.network.files[url] + b"\0"
         self.assertOnlyToolFailed("tool.kiro", "does not match its release manifest")
 
     def test_muse_files_must_match_their_release_manifest(self):
-        url = pins_script.MUSE_BASE.format(version="1.4.20-R8000.1", file="muse-x86-linux")
+        url = pins_script.MUSE_BASE.format(version=self.versions["tool.muse"], file="muse-x86-linux")
         self.network.files[url] += b"tampered"
         self.assertOnlyToolFailed("tool.muse", "does not match its release manifest")
 
@@ -280,7 +280,7 @@ class AgentCLIPinBumpTest(unittest.TestCase):
         self.assertIn("3.0.0 held", summary)
 
     def test_failed_verification_returns_a_failure_status(self):
-        self.network.files[pins_script.KIRO_BASE + "2.40.0/kirocli-aarch64-linux.zip"] += b"tampered"
+        self.network.files[pins_script.KIRO_BASE + self.versions["tool.kiro"] + "/kirocli-aarch64-linux.zip"] += b"tampered"
         with mock.patch("builtins.print"):
             status = pins_script.main(["--pins", str(self.pins_path), "--tools", "tool.kiro"], network=self.network)
         self.assertEqual(status, 1)
