@@ -45,7 +45,7 @@ func TestBootstrapToolchainExtraction(t *testing.T) {
 			archive, destination := filepath.Join(root, "verified.zip"), filepath.Join(root, "toolchain")
 			data := []byte("exact pinned input bytes\x00\xff\n")
 			files := map[string][]byte{"go/bin/go.exe": data, "go/src/unicode ü/file.txt": []byte("nested data")}
-			// The longest entry in the checksum-pinned go1.27.1 Windows ZIP.
+			// The longest entry in the checksum-pinned go1.27.4 Windows ZIP.
 			files["go/src/internal/trace/testdata/generators/go122-syscall-steal-proc-gen-boundary-reacquire-new-proc-bare-m.go"] = data
 			if scenario == "escaping entry" {
 				files = map[string][]byte{"../outside.txt": data}

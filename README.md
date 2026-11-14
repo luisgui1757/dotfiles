@@ -295,7 +295,7 @@ registry mismatch disables its language-server/formatter setup until repair succ
 
 - On macOS 13 or later, Homebrew installs the official `t3-code` cask, and T3
   updates itself.
-- On Ubuntu and Debian, setup unpacks the official v0.1.7 `.deb` privately and
+- On Ubuntu and Debian, setup unpacks the official v0.1.8 `.deb` privately and
   does not run its install scripts. Setup adds a start script, which the
   launcher and T3's own `t3code://` link handler use. The script turns off
   T3's automatic updates with `T3CODE_DISABLE_AUTO_UPDATE=1`, and **Update

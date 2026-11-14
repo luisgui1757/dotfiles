@@ -200,9 +200,7 @@ func TestHomebrewBootstrapConstructorAndReleasedPins(t *testing.T) {
 	if err != nil || len(entries) != 0 {
 		t.Fatal("constructor performed IO", entries, err)
 	}
-	// These reviewed pins are independent of the retired monolithic installer.
-	// Updating the bootstrap requires a new verified upstream revision and hash.
-	if homebrewBootstrapCommit != "35da6871c4be7d7fdab2fd505fb7fa667926a2a5" ||
+	if homebrewBootstrapCommit != "e5b3c5834e3932c8aaa42deef4794076c9b0cbf0" ||
 		homebrewBootstrapSHA256 != "5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148" {
 		t.Fatal("Homebrew bootstrap pins changed without updating reviewed evidence")
 	}
@@ -223,7 +221,7 @@ func TestHomebrewBootstrapFreshLifecycleAndRetention(t *testing.T) {
 		t.Fatal(o, err, f.kinds)
 	}
 	location := f.d.location()
-	f.d.Existing = &location // Real rediscovery after the bootstrap boundary.
+	f.d.Existing = &location
 	if _, err := f.apply("update", "b"); err == nil || len(f.commands) != 2 {
 		t.Fatal("tool updates invoked manager maintenance", err, f.kinds)
 	}

@@ -26,7 +26,7 @@ func TestCRLFCheckoutPreservesInstallerBytes(t *testing.T) {
 	files := map[string][]byte{
 		".gitattributes":                         attributes,
 		"installer/example.go":                   []byte("package example\n\nfunc Value() int {\n\treturn 1\n}\n"),
-		"installer/go.mod":                       []byte("module example\n\ngo 1.27.1\n"),
+		"installer/go.mod":                       []byte("module example\n\ngo 1.27.4\n"),
 		"installer/go.sum":                       []byte("example v1.0.0 h1:fixture\n"),
 		"installer/resources.json":               []byte("{\n  \"schema\": 1\n}\n"),
 		".github/workflows/installer-engine.yml": []byte("name: test\n"),

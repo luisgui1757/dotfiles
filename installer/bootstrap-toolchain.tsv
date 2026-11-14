@@ -1,6 +1,6 @@
-# Source: https://go.dev/dl/?mode=json&include=all ; retrieved 2026-10-10
+# Source: https://go.dev/dl/?mode=json&include=all ; retrieved 2026-11-14
 version	platform	filename	sha256	size
-go1.27.1	darwin-arm64	go1.27.1.darwin-arm64.tar.gz	ee215d57e0ec269c60cc9ceca68e6bda321ba9ee5afe24f4b0988703c2d87d12	68100347
-go1.27.1	linux-amd64	go1.27.1.linux-amd64.tar.gz	63d339f0da5ab53635a56f2490a7984dfe12dfcff22ad749f63edaf590168445	70553950
-go1.27.1	linux-arm64	go1.27.1.linux-arm64.tar.gz	3450b45a3f9ee8568792736a5c5e70a1f2e9b36c35a8f74958c03e51d7d92bec	67009954
-go1.27.1	windows-amd64	go1.27.1.windows-amd64.zip	a3911b5e0e1b1053f25ed0675f4c1c6aad1e2bfcf253df2b9be4caabd2edd95d	78931360
+go1.27.4	darwin-arm64	go1.27.4.darwin-arm64.tar.gz	91a44a2b8a716600ad94a4f143e156116620db8828086a6e3602291be9bd0bb4	68231011
+go1.27.4	linux-amd64	go1.27.4.linux-amd64.tar.gz	7226736c2339719cda28fbf3a54d71aa63bcefe376e98cef00034268dab24840	70680823
+go1.27.4	linux-arm64	go1.27.4.linux-arm64.tar.gz	3392582988a273a87ab5043ee1b2c9c17a2c3c00580bf9326c47a2e0aaaeac92	67129258
+go1.27.4	windows-amd64	go1.27.4.windows-amd64.zip	178ab98950ac69ab25069307dc6ade79f3816e414cce95b4da166a115cde1e7e	79077744

@@ -25,7 +25,7 @@ if [[ ${CHECK_MODULE_CACHE:-0} == 1 ]]; then
   [[ $GOMODCACHE == "$GOPATH/pkg/mod" ]] || { echo 'compiler used inherited module cache' >&2; exit 44; }
 fi
 case "$1" in
-  version) printf 'go version %s linux/amd64\n' "${FAKE_VERSION:-go1.27.1}" ;;
+  version) printf 'go version %s linux/amd64\n' "${FAKE_VERSION:-go1.27.4}" ;;
   mod) echo 'all modules verified' ;;
   list) printf '%s\n' "$PWD/main.go" "$PWD/embedded.json" ;;
   build)
@@ -63,7 +63,7 @@ class LauncherTest(unittest.TestCase):
         (self.checkout / "installer").mkdir()
         shutil.copy2(ROOT / "scripts/installer-bootstrap.sh", self.checkout / "scripts")
         shutil.copy2(ROOT / "setup.sh", self.checkout)
-        self.write("installer/go.mod", "module fixture\n\ngo 1.27.1\n")
+        self.write("installer/go.mod", "module fixture\n\ngo 1.27.4\n")
         self.write("installer/go.sum", "")
         self.write("installer/main.go", "package main\n")
         self.write("installer/embedded.json", "{}\n")
@@ -83,7 +83,7 @@ class LauncherTest(unittest.TestCase):
         data = (self.root / "go.tar.gz").read_bytes()
         self.digest = hashlib.sha256(data).hexdigest()
         self.pin = "version\tplatform\tfilename\tsha256\tsize\n" + (
-            f"go1.27.1\tlinux-amd64\tgo1.27.1.linux-amd64.tar.gz\t{self.digest}\t{len(data)}\n"
+            f"go1.27.4\tlinux-amd64\tgo1.27.4.linux-amd64.tar.gz\t{self.digest}\t{len(data)}\n"
         )
         self.write("installer/bootstrap-toolchain.tsv", self.pin)
         self.environment = dict(os.environ, HOME=shell_path(self.root / "home"),
@@ -224,7 +224,7 @@ class LauncherTest(unittest.TestCase):
     def test_modified_cached_archive_rejected_before_compiler_execution(self):
         self.launch()
         before = self.events()
-        archive = self.root / "cache/dotfiles/bootstrap/go1.27.1.linux-amd64.tar.gz"
+        archive = self.root / "cache/dotfiles/bootstrap/go1.27.4.linux-amd64.tar.gz"
         archive.write_bytes(b"damaged")
         # Any checkout change needs the compiler, which needs the archive.
         self.write("installer/notes.md", "changed\n")
@@ -259,7 +259,7 @@ class LauncherTest(unittest.TestCase):
     def test_unchanged_checkout_reuses_verified_build_without_toolchain(self):
         self.launch()
         (self.root / "log").unlink()
-        (self.root / "cache/dotfiles/bootstrap/go1.27.1.linux-amd64.tar.gz").unlink()
+        (self.root / "cache/dotfiles/bootstrap/go1.27.4.linux-amd64.tar.gz").unlink()
         result = self.launch("machine")
         self.assertEqual(result.stdout, '{"operation":"check"}\n')
         self.assertFalse((self.root / "log").exists(), "unchanged checkout extracted or ran the toolchain")
