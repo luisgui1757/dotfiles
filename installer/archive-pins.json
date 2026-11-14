@@ -3503,9 +3503,9 @@
     },
     "tool.t3": {
       "darwin/arm64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-darwin-arm64.tar.gz",
-        "sha256": "a95be61a0260f8daf62f0e218bd3e60386a6674d32a3fc46e2d3bc159f9b7daa",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-darwin-arm64.tar.gz",
+        "sha256": "7d2eb8c0687b70ca03a9d35498381852d3792983589e82d1fb1831c08f0b2301",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3520,9 +3520,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-linux-x64.tar.gz",
-        "sha256": "b9c49dc00c23fbbc5961bdaff2d88e556d96c8dbd638c4501e2937c70650a9e5",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-x64.tar.gz",
+        "sha256": "0141025335da334759cecd8db3483e09772f3600ca03674698524e7d94291362",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3538,9 +3538,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-linux-arm64.tar.gz",
-        "sha256": "2bffbf608eef736c5c35e3431a7e5261d0c909e33d8a8feb83ef26a3747cf8f4",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-linux-arm64.tar.gz",
+        "sha256": "52023bc5728a4dee4de361ad6fef7c236f1efb2742ff25e29d5c55e2fb662eea",
         "format": "tar.gz",
         "strip_components": 1,
         "commands": {
@@ -3556,9 +3556,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "0.1.8",
-        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.8/t3-0.1.8-win32-x64.zip",
-        "sha256": "347066125898dd1fe0265816d0480b038a301973c0f85b6e49967c0e29710f3f",
+        "version": "0.1.9",
+        "url": "https://github.com/pingdotgg/t3code/releases/download/v0.1.9/t3-0.1.9-win32-x64.zip",
+        "sha256": "aeebee6a1a97ce546ef53d38a30e36dfe264c2586b4268fb9a0a37690c6082d9",
         "format": "zip",
         "strip_components": 1,
         "commands": {
