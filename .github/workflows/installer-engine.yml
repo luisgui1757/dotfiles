@@ -61,7 +61,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Verify actual native runner target
@@ -217,7 +217,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Verify actual native runner target
@@ -252,7 +252,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Verify actual native runner target
@@ -330,7 +330,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Prepare an actually absent Homebrew prefix on this disposable runner
@@ -386,7 +386,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Exercise the native provider and installed application as root without sudo
@@ -432,7 +432,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Exercise the native provider and installed application as root without sudo
@@ -461,7 +461,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Prepare missing Apple tools while retaining Homebrew on this disposable runner
@@ -555,7 +555,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
-          go-version: 1.27.1
+          go-version: 1.27.4
           cache: ${{ github.event_name == 'pull_request' }}
           cache-dependency-path: installer/go.sum
       - name: Prepare the disposable Windows container engine

@@ -202,7 +202,7 @@ Describe 'Bootstrap verified build reuse' {
         New-Item -ItemType Directory -Path (Join-Path $script:Checkout 'scripts') -Force | Out-Null
         Set-Content -LiteralPath (Join-Path $script:Checkout 'installer/cmd/main.go') -Value 'package main' -NoNewline
         Set-Content -LiteralPath (Join-Path $script:Checkout 'scripts/installer-bootstrap.ps1') -Value '# launcher' -NoNewline
-        $script:Pin = [pscustomobject]@{ version = 'go1.27.1'; platform = 'windows-amd64'; sha256 = 'a' * 64 }
+        $script:Pin = [pscustomobject]@{ version = 'go1.27.4'; platform = 'windows-amd64'; sha256 = 'a' * 64 }
         $Checkout = $script:Checkout
         $Pin = $script:Pin
     }
