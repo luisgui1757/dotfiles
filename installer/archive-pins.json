@@ -3433,9 +3433,9 @@
     },
     "tool.zen": {
       "linux/amd64": {
-        "version": "1.23.2b",
-        "url": "https://github.com/zen-browser/desktop/releases/download/1.23.2b/zen.linux-x86_64.tar.xz",
-        "sha256": "5e67f4fa081b1b437243c464449ea1bd2a3b15b6f932487a8aa0c25aa8514600",
+        "version": "1.24.1b",
+        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.1b/zen.linux-x86_64.tar.xz",
+        "sha256": "c592a31fe8faa5ddfe91d6243b50c3107e1831c1247539fe03cc04f0fd5cb9cd",
         "format": "tar.xz",
         "strip_components": 1,
         "commands": {
@@ -3454,9 +3454,9 @@
         "zen_profile_revision": 1
       },
       "linux/arm64": {
-        "version": "1.23.2b",
-        "url": "https://github.com/zen-browser/desktop/releases/download/1.23.2b/zen.linux-aarch64.tar.xz",
-        "sha256": "96971f099c0adeae6a2edb4e128596d0706df974ac279b5ecde2aa93b07621d8",
+        "version": "1.24.1b",
+        "url": "https://github.com/zen-browser/desktop/releases/download/1.24.1b/zen.linux-aarch64.tar.xz",
+        "sha256": "ac0fc39fd2342066027e56a42bdebfea910e9fdc539d02dd7d658e39c38e42dc",
         "format": "tar.xz",
         "strip_components": 1,
         "commands": {
