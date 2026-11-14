@@ -10,9 +10,7 @@ import (
 	"strings"
 )
 
-// These are the released install-deps.sh bootstrap pins. The matching regression
-// deliberately fails when that source changes without updating this recipe.
-const homebrewBootstrapCommit = "35da6871c4be7d7fdab2fd505fb7fa667926a2a5"
+const homebrewBootstrapCommit = "e5b3c5834e3932c8aaa42deef4794076c9b0cbf0"
 const homebrewBootstrapSHA256 = "5f333bbe53bc490e51e7ccb1df8779b3dd6ee73a1a7379efda216edb08ccb148"
 const homebrewBootstrapURL = "https://raw.githubusercontent.com/Homebrew/install/" + homebrewBootstrapCommit + "/install.sh"
 
