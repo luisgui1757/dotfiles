@@ -698,9 +698,9 @@
         ],
         "azure_cli": {
           "python": {
-            "version": "3.14.8",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
-            "sha256": "936217c0e6893f51af939474bee18ecf5e6fe47b986d2c163f19b57c682e4a83",
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+            "sha256": "f15ec3d15460dd66c2eb88639b152cd9040e7d1ece11e38bf89e8f53f0171e02",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -728,9 +728,9 @@
         "libc": "glibc",
         "azure_cli": {
           "python": {
-            "version": "3.14.8",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
-            "sha256": "ddc902fd26460f728758c67d80417c1031edf97589f1f162c4ba3aa158a35998",
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "c2ff2e97422f5d3896a16e0317fd212ba977bbf2688d93a6f7a03d817506bd30",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -758,9 +758,9 @@
         "libc": "glibc",
         "azure_cli": {
           "python": {
-            "version": "3.14.8",
-            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.14.8%2B20261009-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
-            "sha256": "54f9cd13b97add6bbd077175b6d89f974cc582ece1c40ace1893067582edaf0e",
+            "version": "3.14.10",
+            "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.14.10%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+            "sha256": "38fd50f07170adc29d481913d1c30b17ecb538fbe290315fe1f83d84fdd5b694",
             "format": "tar.gz",
             "strip_components": 1,
             "commands": {},
@@ -1413,9 +1413,9 @@
     },
     "tool.python": {
       "darwin/arm64": {
-        "version": "3.13.16",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-aarch64-apple-darwin-install_only_stripped.tar.gz",
-        "sha256": "11785155d0f70e634178219c20925d8f20be00a3da4684fc4f5019dd15602ef7",
+        "version": "3.13.18",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-aarch64-apple-darwin-install_only_stripped.tar.gz",
+        "sha256": "7a2384641584ab9984221fcb0fc9265df465922af71be71410529e2a9c3f0540",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1430,9 +1430,9 @@
         "python_stdlib": "lib/python3.13"
       },
       "linux/amd64": {
-        "version": "3.13.16",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
-        "sha256": "24801ea31c7d406d559a17e2226325c723d50c56900b9c0da7b62adaae2affc9",
+        "version": "3.13.18",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "f2d2199eb25880e07863b391cf7124e7ffa1338b0d65600dfcec117c4223a7fb",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1448,9 +1448,9 @@
         "python_stdlib": "lib/python3.13"
       },
       "linux/arm64": {
-        "version": "3.13.16",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
-        "sha256": "52c6993abd6ac687cceb787ecee83b166271bc06ad80ac9cac82c5d28d3c00bc",
+        "version": "3.13.18",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-aarch64-unknown-linux-gnu-install_only_stripped.tar.gz",
+        "sha256": "55c00325f7c1fddf325dfc621aabdfbbac4dc54adda224af88ec411dc12db239",
         "format": "tar.gz",
         "commands": {
           "python3": "bin/python3"
@@ -1466,9 +1466,9 @@
         "python_stdlib": "lib/python3.13"
       },
       "windows/amd64": {
-        "version": "3.13.16",
-        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261009/cpython-3.13.16%2B20261009-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
-        "sha256": "3a7adfb69e3ff02a41ed38ac637808532b438ab3c8619af46ca5dbec5c1f5190",
+        "version": "3.13.18",
+        "url": "https://github.com/astral-sh/python-build-standalone/releases/download/20261110/cpython-3.13.18%2B20261110-x86_64-pc-windows-msvc-install_only_stripped.tar.gz",
+        "sha256": "2e0fed09d48989f64c9305da9ff2d37a41c0d13ab2aa6283405b2b620dfbf805",
         "format": "tar.gz",
         "commands": {
           "python": "python.exe"
