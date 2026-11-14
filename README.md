@@ -393,8 +393,8 @@ installer's Update menu to reconcile reviewed pins for either CLI.
 A daily workflow proposes verified updates for the five agent CLIs and the
 GitHub tools in its update policy, including T3. It opens one grouped PR and
 holds major releases for review. A scheduled maintenance agent merges it after
-its native checks pass. Then run `git pull` and **Update tools** on each machine. Some pins still need manual
-updates. See [coverage and exceptions](docs/security/supply-chain.md#archive-pin-proposals).
+its native checks pass. Then run `git pull` and **Update tools** on each machine. The same agent
+updates the other pins from the Renovate dashboard. See [coverage and exceptions](docs/security/supply-chain.md#archive-pin-proposals).
 **GitHub Copilot CLI** uses the pinned standalone build from its official GitHub
 release (one native executable; no npm, Node or install script). On Windows it
 also installs the shared PowerShell 7 it needs. Copilot ignores its `autoUpdate`
