@@ -406,9 +406,9 @@
     },
     "plugin.zsh-autosuggestions": {
       "darwin/arm64": {
-        "version": "v0.7.1",
-        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
-        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "version": "85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "sha256": "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
@@ -418,9 +418,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "v0.7.1",
-        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
-        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "version": "85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "sha256": "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
@@ -430,9 +430,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "v0.7.1",
-        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/e52ee8ca55bcc56a17c828767a3f98f22a68d4eb",
-        "sha256": "166fad9326c99904fd3b16b5d770efb4f5df39a674599e72bba8fc41636ab065",
+        "version": "85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "url": "https://codeload.github.com/zsh-users/zsh-autosuggestions/tar.gz/85919cd1ffa7d2d5412f6d3fe437ebdbeeec4fc5",
+        "sha256": "20665e469e720e674964a66854d5534b9af78cdfd438512746ecd1ade8e819ce",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
