@@ -368,9 +368,9 @@
     },
     "plugin.fzf-tab": {
       "darwin/arm64": {
-        "version": "v1.3.0",
-        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
-        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "version": "24105b15714bfec37989ed5c5b6e60f572253019",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/24105b15714bfec37989ed5c5b6e60f572253019",
+        "sha256": "67ee2bb60be09b6054b6b149549bb5e341be7d0ecf374f327f2d43e2349b31b1",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
@@ -380,9 +380,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "v1.3.0",
-        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
-        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "version": "24105b15714bfec37989ed5c5b6e60f572253019",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/24105b15714bfec37989ed5c5b6e60f572253019",
+        "sha256": "67ee2bb60be09b6054b6b149549bb5e341be7d0ecf374f327f2d43e2349b31b1",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
@@ -392,9 +392,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "v1.3.0",
-        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/d7e0234614dbe5369fdd760907d12c0e05a4dccc",
-        "sha256": "3f0f56c168ab59ad87363a15931f27847eac5dfc34e10a033a04ae84372c56ac",
+        "version": "24105b15714bfec37989ed5c5b6e60f572253019",
+        "url": "https://codeload.github.com/Aloxaf/fzf-tab/tar.gz/24105b15714bfec37989ed5c5b6e60f572253019",
+        "sha256": "67ee2bb60be09b6054b6b149549bb5e341be7d0ecf374f327f2d43e2349b31b1",
         "format": "tar.gz",
         "commands": {},
         "bin_dirs": [],
