@@ -983,7 +983,12 @@
       },
       "requires": [
         "integration.shells"
-      ]
+      ],
+      "platform_requires": {
+        "linux": [
+          "library.libatomic1"
+        ]
+      }
     },
     {
       "id": "tool.python",
@@ -3033,6 +3038,22 @@
         "linux": {
           "provider": "apt",
           "package": "libstdc++6"
+        }
+      }
+    },
+    {
+      "id": "library.libatomic1",
+      "name": "libatomic1",
+      "platforms": [
+        "linux"
+      ],
+      "action": "apt-library",
+      "scope": "machine",
+      "shared": true,
+      "bindings": {
+        "linux": {
+          "provider": "apt",
+          "package": "libatomic1"
         }
       }
     },
