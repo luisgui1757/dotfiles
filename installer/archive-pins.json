@@ -580,9 +580,9 @@
     },
     "tool.gh": {
       "darwin/arm64": {
-        "version": "2.104.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_macOS_arm64.zip",
-        "sha256": "23b12706219b9892e44236f988444a24adcf29284e16b35e03ba5b863fb6eb8e",
+        "version": "2.105.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_macOS_arm64.zip",
+        "sha256": "2a5d03103ae444927383b93d9ffd65579a26e2eb900ce1cf11f55258d5319ded",
         "format": "zip",
         "commands": {
           "gh": "bin/gh"
@@ -593,9 +593,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.104.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_linux_arm64.tar.gz",
-        "sha256": "cb34cefc6f4e77b90731374a2b737516bb8f3033c6ca46aa949e5344f68069e3",
+        "version": "2.105.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_linux_arm64.tar.gz",
+        "sha256": "b1278c75107423d818f1937fd92cafc9e5e9b606631568f68d7fb816f5885a02",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -606,9 +606,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.104.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_windows_amd64.zip",
-        "sha256": "08c06d10482f12c478018cd259f64acbd5f625712cadf331aad19ba973c879e5",
+        "version": "2.105.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_windows_amd64.zip",
+        "sha256": "8813a72c899900afaa10e3fec8fbc64b908c89dbfe837e95ed2fa500fc140627",
         "format": "zip",
         "commands": {
           "gh": "bin/gh.exe"
@@ -618,9 +618,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.104.0",
-        "url": "https://github.com/cli/cli/releases/download/v2.104.0/gh_2.104.0_linux_amd64.tar.gz",
-        "sha256": "98cb101ad87dbbd3f6b2f2bfcbd43197ccd07643140121d8a9cfaa91eadbc24e",
+        "version": "2.105.0",
+        "url": "https://github.com/cli/cli/releases/download/v2.105.0/gh_2.105.0_linux_amd64.tar.gz",
+        "sha256": "79e7ab5db738c48777b696e374f8b428f0647debfb424f44d2f426370407fe2f",
         "format": "tar.gz",
         "commands": {
           "gh": "bin/gh"
@@ -2944,9 +2944,9 @@
     },
     "tool.claude": {
       "darwin/arm64": {
-        "version": "2.1.329",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.329.tgz",
-        "sha256": "705b53d7138e476686708921e321b4603a7973823362bd079b0400e54756df39",
+        "version": "2.1.330",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-darwin-arm64/-/claude-code-darwin-arm64-2.1.330.tgz",
+        "sha256": "b8c91d706567b670e4f2b6112199c5db3125ca237ac214e6143e7094bd0cb33b",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2957,9 +2957,9 @@
         "strip_components": 1
       },
       "linux/amd64": {
-        "version": "2.1.329",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.329.tgz",
-        "sha256": "a74d6c8441a19b2d2f44c1f5735b37dc0a34b2d4f224f8333d08ce03cf2060bb",
+        "version": "2.1.330",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-x64/-/claude-code-linux-x64-2.1.330.tgz",
+        "sha256": "40ff30c5768723958032132065e6fcdd1e2dc3a2b3ff9a0bf36c6620ef1c40ef",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2971,9 +2971,9 @@
         "strip_components": 1
       },
       "linux/arm64": {
-        "version": "2.1.329",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.329.tgz",
-        "sha256": "144f8c33cebc8830d8dc82c275a8172ac0330000a71df562d8a8d09795bcdc8e",
+        "version": "2.1.330",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-linux-arm64/-/claude-code-linux-arm64-2.1.330.tgz",
+        "sha256": "5460d42c696670f4fd2a7ec619719edda14a576b28ee3c289b348ade96efbf6d",
         "format": "tar.gz",
         "commands": {
           "claude": "claude"
@@ -2985,9 +2985,9 @@
         "strip_components": 1
       },
       "windows/amd64": {
-        "version": "2.1.329",
-        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.329.tgz",
-        "sha256": "e54e1378a9fc3478b4f8769ec8ab7c48a0d234a807c6853edb17a886cd905280",
+        "version": "2.1.330",
+        "url": "https://registry.npmjs.org/@anthropic-ai/claude-code-win32-x64/-/claude-code-win32-x64-2.1.330.tgz",
+        "sha256": "3ab01299048000588d144fe0be9348441b931c224a5e87d51eaa78e7e0075577",
         "format": "tar.gz",
         "commands": {
           "claude": "claude.exe"
@@ -3206,9 +3206,9 @@
     },
     "tool.opencode": {
       "darwin/arm64": {
-        "version": "2.3.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-darwin-arm64.zip",
-        "sha256": "7907df2b12720a840fbb49c5b978b9b82925b6bf75479a5fd216afa8932b6702",
+        "version": "2.3.2",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.2/opencode-darwin-arm64.zip",
+        "sha256": "31ab5a06a29edc7e49b895f35c2b64ebfe7c7f0437b0f2581b006efcd79fee1a",
         "format": "zip",
         "commands": {
           "opencode": "opencode"
@@ -3218,9 +3218,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "2.3.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-x64-baseline.tar.gz",
-        "sha256": "fc0f81522aceeabac47693d88389efa2bc517ce74c2c38fd6967819fcc6e4d3b",
+        "version": "2.3.2",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.2/opencode-linux-x64-baseline.tar.gz",
+        "sha256": "563b5d663637226b6e3bb4bb6803281bc39b0d2cd88db06d674b6420aab009b0",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3231,9 +3231,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "2.3.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-linux-arm64.tar.gz",
-        "sha256": "3207fb5cdec448d479242c0f1a14f4f7bdfcad3a79209b5eb8f9003725e93711",
+        "version": "2.3.2",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.2/opencode-linux-arm64.tar.gz",
+        "sha256": "9d10185acdb72336e086e699ca363a6065f410fd3c1caed0dc8046e95ac06ccb",
         "format": "tar.gz",
         "commands": {
           "opencode": "opencode"
@@ -3244,9 +3244,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "2.3.0",
-        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.0/opencode-windows-x64-baseline.zip",
-        "sha256": "a3abde3f736a1b51acb28466001333189184507096cb2fe0d684fe822cbd37ec",
+        "version": "2.3.2",
+        "url": "https://github.com/anomalyco/opencode/releases/download/v2.3.2/opencode-windows-x64-baseline.zip",
+        "sha256": "8dcfe392a79412bf908de4c0cf5338c52589147eff54f1a46c25fb24a94708e7",
         "format": "zip",
         "commands": {
           "opencode": "opencode.exe"
@@ -3313,9 +3313,9 @@
     },
     "tool.copilot": {
       "darwin/arm64": {
-        "version": "1.0.112",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-darwin-arm64.tar.gz",
-        "sha256": "4a4a6aa624dceb76a23e1a53fb5f64e87a0bb5a2161a5017e0edf78d7082ce68",
+        "version": "1.0.114",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-darwin-arm64.tar.gz",
+        "sha256": "35e8165a6ca811fb907b5afb7892e53d1bb85426bb77fe3f83b7f0b4e955249a",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3325,9 +3325,9 @@
         ]
       },
       "linux/amd64": {
-        "version": "1.0.112",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-x64.tar.gz",
-        "sha256": "dfe7e59acf04f0b7f59b024ea9db101a9246503e9bf7152eb668fbb2a469b151",
+        "version": "1.0.114",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-linux-x64.tar.gz",
+        "sha256": "b91a96f2257297cfb67ed6784a2a658609a6b8c2ee2ded18af9c9abe8cc790ae",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3338,9 +3338,9 @@
         "libc": "glibc"
       },
       "linux/arm64": {
-        "version": "1.0.112",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-linux-arm64.tar.gz",
-        "sha256": "491d18303505935675dc20987ef0c5f3ae899f81e66c53d567ad97a8b03e504e",
+        "version": "1.0.114",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-linux-arm64.tar.gz",
+        "sha256": "a204154d4522a7c3aa73a65ba598e432f6aafe37d5fa31cf853163a27d98018e",
         "format": "tar.gz",
         "commands": {
           "copilot": "copilot"
@@ -3351,9 +3351,9 @@
         "libc": "glibc"
       },
       "windows/amd64": {
-        "version": "1.0.112",
-        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.112/copilot-win32-x64.zip",
-        "sha256": "159a5e610c7b64c4b68b97a812fd7913182f372cb84ce688d81167d5277896d9",
+        "version": "1.0.114",
+        "url": "https://github.com/github/copilot-cli/releases/download/v1.0.114/copilot-win32-x64.zip",
+        "sha256": "be5af88c044842949560535b083c47e0c2b41904769cca599ee2cbf937dc9eed",
         "format": "zip",
         "commands": {
           "copilot": "copilot.exe"
